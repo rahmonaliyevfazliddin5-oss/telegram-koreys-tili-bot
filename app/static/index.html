@@ -12,6 +12,11 @@
   <!-- Yuqori qism (Header) -->
   <header class="app-header">
     <div class="header-inner">
+      <button class="header-back-btn" id="btnHeaderBack" aria-label="Orqaga">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
       <div class="header-title" id="headerTitle">Admin Paneli</div>
       <button class="header-close-btn" id="btnClose" aria-label="Yopish">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -336,7 +341,7 @@
         </div>
         <div class="form-group">
           <label for="studentGrade">Sinf</label>
-          <input type="text" id="studentGrade" class="form-input" required maxlength="50">
+          <input type="text" id="studentGrade" class="form-input" placeholder="(Ixtiyoriy)" maxlength="50">
         </div>
         <button type="submit" class="btn btn-primary btn-block" id="btnSaveStudent">Saqlash</button>
       </form>

@@ -16,6 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.api.auth import validate_init_data
 from app.services.cache_service import invalidate_rating_cache, invalidate_sources_cache
 from app.services.translator import translate_text
+from app.schemas.student import StudentCreate, StudentResponse
+from app.api.routers.admin_auth import admin_logout
 
 
 BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
@@ -94,6 +96,50 @@ async def test_translator_edge_cases():
     assert await translate_text("", "uz", "en") == ""
     assert await translate_text("Salom", "uz", "uz") == "Salom"
     assert await translate_text("   ", "uz", "en") == "   "
+
+
+def test_student_schema_nullable():
+    s1 = StudentCreate(first_name="Muxammadsodiq", last_name="", grade=None)
+    assert s1.first_name == "Muxammadsodiq"
+    assert s1.last_name == ""
+    assert s1.grade is None
+
+    s2 = StudentCreate(first_name="Ali", last_name="Valiyev")
+    assert s2.grade is None
+
+
+def test_students_seed_json_integrity():
+    json_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "students_seed.json")
+    assert os.path.exists(json_path)
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    assert len(data) == 46
+    for item in data:
+        assert set(item.keys()) == {"last_name", "first_name"}
+        assert "grade" not in item
+        assert "phone" not in item
+
+    mux = next(d for d in data if d["first_name"] == "Muxammadsodiq")
+    assert mux["last_name"] == ""
+
+    yoldash = next(d for d in data if "Yo‘ldashev" in d["last_name"])
+    assert "‘" in yoldash["last_name"]
+
+
+@pytest.mark.asyncio
+async def test_admin_logout_endpoint():
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = "uz"
+
+    with patch("app.api.routers.admin_auth.bot.send_message", new_callable=AsyncMock) as mock_send, \
+         patch("app.api.routers.admin_auth.get_active_sources", new_callable=AsyncMock) as mock_sources:
+        mock_sources.return_value = [{"id": 1, "title": "Dars jadvali"}]
+        res = await admin_logout(admin={"user_id": 99999}, redis=mock_redis)
+        assert res == {"ok": True}
+        mock_redis.delete.assert_called_once_with("admin_session:99999")
+        mock_send.assert_called_once()
+        assert mock_send.call_args[1]["chat_id"] == 99999
 
 
 def test_zero_emojis_in_app():

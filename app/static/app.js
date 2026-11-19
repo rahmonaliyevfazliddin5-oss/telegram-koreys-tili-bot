@@ -38,6 +38,27 @@ const haptic = {
   }
 };
 
+// Orqaga harakatini boshqarish
+async function handleBackNavigation() {
+  haptic.impact("light");
+  const anyOpenModal = document.querySelector(".modal-overlay:not(.hidden), .bottom-sheet-overlay:not(.hidden)");
+  if (anyOpenModal) {
+    closeAllSheetsAndModals();
+    return;
+  }
+
+  // Asosiy sahifalarda orqaga bosilganda POST /api/admin/logout chaqirilib, so'ng Telegram.WebApp.close() qilinadi
+  try {
+    await apiRequest("/api/admin/logout", { method: "POST" });
+  } catch (err) {
+    console.warn("Logout xatosi:", err);
+  } finally {
+    if (tg) {
+      tg.close();
+    }
+  }
+}
+
 // Telegram orqaga (BackButton) boshqaruvi
 function updateBackButton() {
   if (!tg?.BackButton) return;
@@ -45,15 +66,21 @@ function updateBackButton() {
   if (anyOpenModal) {
     tg.BackButton.show();
   } else {
-    tg.BackButton.hide();
+    tg.BackButton.show();
   }
 }
 
 if (tg?.BackButton) {
+  tg.BackButton.show();
   tg.BackButton.onClick(() => {
-    closeAllSheetsAndModals();
+    handleBackNavigation();
   });
 }
+
+// Header'dagi orqaga (chevron-left) tugmasi
+document.getElementById("btnHeaderBack")?.addEventListener("click", () => {
+  handleBackNavigation();
+});
 
 // Yopish tugmasi
 document.getElementById("btnClose")?.addEventListener("click", () => {
@@ -374,9 +401,11 @@ function renderStudents() {
     const cardLeft = document.createElement("div");
     cardLeft.className = "card-left";
 
+    const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
+
     const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.style.background = getAvatarColor(`${st.first_name} ${st.last_name}`);
+    avatar.style.background = getAvatarColor(studentFullName);
     avatar.textContent = getInitials(st.first_name, st.last_name);
 
     const info = document.createElement("div");
@@ -384,14 +413,16 @@ function renderStudents() {
 
     const title = document.createElement("div");
     title.className = "card-title";
-    title.textContent = `${st.first_name} ${st.last_name}`;
-
-    const subtitle = document.createElement("div");
-    subtitle.className = "card-subtitle";
-    subtitle.textContent = `Sinf: ${st.grade}`;
+    title.textContent = studentFullName;
 
     info.appendChild(title);
-    info.appendChild(subtitle);
+
+    if (st.grade && st.grade.trim() !== "") {
+      const subtitle = document.createElement("div");
+      subtitle.className = "card-subtitle";
+      subtitle.textContent = `Sinf: ${st.grade.trim()}`;
+      info.appendChild(subtitle);
+    }
 
     cardLeft.appendChild(avatar);
     cardLeft.appendChild(info);
@@ -418,12 +449,22 @@ function openStudentActionSheet(st) {
   const nameEl = document.getElementById("sheetStudentName");
   const gradeEl = document.getElementById("sheetStudentGrade");
 
+  const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
+
   if (avatarEl) {
-    avatarEl.style.background = getAvatarColor(`${st.first_name} ${st.last_name}`);
+    avatarEl.style.background = getAvatarColor(studentFullName);
     avatarEl.textContent = getInitials(st.first_name, st.last_name);
   }
-  if (nameEl) nameEl.textContent = `${st.first_name} ${st.last_name}`;
-  if (gradeEl) gradeEl.textContent = `Sinf: ${st.grade}`;
+  if (nameEl) nameEl.textContent = studentFullName;
+  if (gradeEl) {
+    if (st.grade && st.grade.trim() !== "") {
+      gradeEl.textContent = `Sinf: ${st.grade.trim()}`;
+      gradeEl.classList.remove("hidden");
+    } else {
+      gradeEl.textContent = "";
+      gradeEl.classList.add("hidden");
+    }
+  }
 
   sheetStudentActions?.classList.remove("hidden");
   updateBackButton();
@@ -472,9 +513,9 @@ function openAddStudentModal() {
 function openEditStudentModal(st) {
   document.getElementById("modalStudentTitle").textContent = "O'quvchini tahrirlash";
   document.getElementById("studentId").value = st.id;
-  document.getElementById("studentFirstName").value = st.first_name;
-  document.getElementById("studentLastName").value = st.last_name;
-  document.getElementById("studentGrade").value = st.grade;
+  document.getElementById("studentFirstName").value = st.first_name || "";
+  document.getElementById("studentLastName").value = st.last_name || "";
+  document.getElementById("studentGrade").value = st.grade || "";
   modalStudent?.classList.remove("hidden");
   updateBackButton();
 }
@@ -495,10 +536,11 @@ formStudent?.addEventListener("submit", async (e) => {
   saveBtn.textContent = "Saqlanmoqda...";
 
   const id = document.getElementById("studentId").value;
+  const gradeVal = document.getElementById("studentGrade").value.trim();
   const payload = {
     first_name: document.getElementById("studentFirstName").value.trim(),
     last_name: document.getElementById("studentLastName").value.trim(),
-    grade: document.getElementById("studentGrade").value.trim()
+    grade: gradeVal || null
   };
 
   try {
@@ -688,9 +730,11 @@ function renderAttendanceList() {
     const cardLeft = document.createElement("div");
     cardLeft.className = "card-left";
 
+    const studentFullName = `${it.first_name || ""} ${it.last_name || ""}`.trim();
+
     const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.style.background = getAvatarColor(`${it.first_name} ${it.last_name}`);
+    avatar.style.background = getAvatarColor(studentFullName);
     avatar.textContent = getInitials(it.first_name, it.last_name);
 
     const info = document.createElement("div");
@@ -698,14 +742,16 @@ function renderAttendanceList() {
 
     const title = document.createElement("div");
     title.className = "card-title";
-    title.textContent = `${it.first_name} ${it.last_name}`;
-
-    const subtitle = document.createElement("div");
-    subtitle.className = "card-subtitle";
-    subtitle.textContent = `Sinf: ${it.grade}`;
+    title.textContent = studentFullName;
 
     info.appendChild(title);
-    info.appendChild(subtitle);
+
+    if (it.grade && it.grade.trim() !== "") {
+      const subtitle = document.createElement("div");
+      subtitle.className = "card-subtitle";
+      subtitle.textContent = `Sinf: ${it.grade.trim()}`;
+      info.appendChild(subtitle);
+    }
 
     cardLeft.appendChild(avatar);
     cardLeft.appendChild(info);
@@ -907,9 +953,11 @@ function renderGradesList() {
     const cardLeft = document.createElement("div");
     cardLeft.className = "card-left";
 
+    const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
+
     const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.style.background = getAvatarColor(`${st.first_name} ${st.last_name}`);
+    avatar.style.background = getAvatarColor(studentFullName);
     avatar.textContent = getInitials(st.first_name, st.last_name);
 
     const info = document.createElement("div");
@@ -917,14 +965,16 @@ function renderGradesList() {
 
     const title = document.createElement("div");
     title.className = "card-title";
-    title.textContent = `${st.first_name} ${st.last_name}`;
-
-    const subtitle = document.createElement("div");
-    subtitle.className = "card-subtitle";
-    subtitle.textContent = `Sinf: ${st.grade}`;
+    title.textContent = studentFullName;
 
     info.appendChild(title);
-    info.appendChild(subtitle);
+
+    if (st.grade && st.grade.trim() !== "") {
+      const subtitle = document.createElement("div");
+      subtitle.className = "card-subtitle";
+      subtitle.textContent = `Sinf: ${st.grade.trim()}`;
+      info.appendChild(subtitle);
+    }
 
     cardLeft.appendChild(avatar);
     cardLeft.appendChild(info);
@@ -963,7 +1013,7 @@ function openGradeBottomSheet(student, gradeObj) {
 
   const titleEl = document.getElementById("sheetGradeStudentName");
   if (titleEl) {
-    titleEl.textContent = `${student.first_name} ${student.last_name}`;
+    titleEl.textContent = `${student.first_name || ""} ${student.last_name || ""}`.trim();
   }
 
   // 1-5 tugmalarni yangilash

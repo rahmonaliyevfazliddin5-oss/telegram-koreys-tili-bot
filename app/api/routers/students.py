@@ -61,8 +61,8 @@ async def create_student(
 ):
     student = Student(
         first_name=payload.first_name.strip(),
-        last_name=payload.last_name.strip(),
-        grade=payload.grade.strip()
+        last_name=payload.last_name.strip() if payload.last_name else "",
+        grade=payload.grade.strip() if payload.grade else None
     )
     db.add(student)
     await db.commit()
@@ -91,8 +91,8 @@ async def update_student(
         )
 
     student.first_name = payload.first_name.strip()
-    student.last_name = payload.last_name.strip()
-    student.grade = payload.grade.strip()
+    student.last_name = payload.last_name.strip() if payload.last_name else ""
+    student.grade = payload.grade.strip() if payload.grade else None
 
     await db.commit()
     await db.refresh(student)

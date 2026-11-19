@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -10,11 +11,14 @@ from fastapi.responses import JSONResponse
 from aiogram.types import Update
 from sqlalchemy import text
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = BASE_DIR / "app" / "static"
+
 from app.config import settings
 from app.database import engine
 from app.redis import get_redis, close_redis
 from app.bot.loader import bot, dp
-from app.api.routers import students, attendance, grades, sources
+from app.api.routers import students, attendance, grades, sources, admin_auth
 
 logging.basicConfig(
     level=logging.INFO,
@@ -139,10 +143,11 @@ async def telegram_webhook(
 
 
 # API routerlarni ulash
+app.include_router(admin_auth.router, prefix="/api/admin", tags=["Admin Auth"])
 app.include_router(students.router, prefix="/api/students", tags=["Students"])
 app.include_router(attendance.router, prefix="/api/attendance", tags=["Attendance"])
 app.include_router(grades.router, prefix="/api/grades", tags=["Grades"])
 app.include_router(sources.router, prefix="/api/sources", tags=["Sources"])
 
 # Mini App statik fayllari (/app)
-app.mount("/app", StaticFiles(directory="app/static", html=True), name="static_app")
+app.mount("/app", StaticFiles(directory=str(STATIC_DIR), html=True), name="static_app")

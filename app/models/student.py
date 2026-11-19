@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import String, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -9,8 +10,8 @@ class Student(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    grade: Mapped[str] = mapped_column(String(50), nullable=False)
+    last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="")
+    grade: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

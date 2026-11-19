@@ -115,7 +115,8 @@ async def show_rating(message: Message, lang: str):
     items, total_pages = paginate_rating(rating_list, page=1, page_size=10)
     lines = [get_text("rating_title", user_lang), ""]
     for item in items:
-        lines.append(f"{item['rank']}. {item['first_name']} {item['last_name']} - {item['total_score']}")
+        name = f"{item['first_name']} {item.get('last_name') or ''}".strip()
+        lines.append(f"{item['rank']}. {name} - {item['total_score']}")
 
     await message.answer(
         "\n".join(lines),
@@ -138,7 +139,8 @@ async def process_rating_page(callback: CallbackQuery, lang: str):
     items, total_pages = paginate_rating(rating_list, page=page, page_size=10)
     lines = [get_text("rating_title", user_lang), ""]
     for item in items:
-        lines.append(f"{item['rank']}. {item['first_name']} {item['last_name']} - {item['total_score']}")
+        name = f"{item['first_name']} {item.get('last_name') or ''}".strip()
+        lines.append(f"{item['rank']}. {name} - {item['total_score']}")
 
     try:
         await callback.message.edit_text(

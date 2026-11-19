@@ -12,6 +12,6 @@ class AttendanceUpdate(BaseModel):
 class AttendanceStudentItem(BaseModel):
     student_id: int
     first_name: str
-    last_name: str
-    grade: str
+    last_name: Optional[str] = ""
+    grade: Optional[str] = None
     status: Optional[str] = None

@@ -2,7 +2,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 import sys
 import os
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -68,5 +68,31 @@ async def test_api_crud_with_mocked_admin():
             # Test invalid student payload (empty first_name)
             bad_student_res = await client.post("/api/students", json={"first_name": "", "last_name": "Test", "grade": "10-A"})
             assert bad_student_res.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_admin_logout_e2e():
+    async def mock_admin():
+        return {"user_id": 99999, "first_name": "Admin"}
+
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = "uz"
+
+    app.dependency_overrides[get_current_admin] = mock_admin
+    app.dependency_overrides[get_redis] = lambda: mock_redis
+
+    try:
+        with patch("app.api.routers.admin_auth.bot.send_message", new_callable=AsyncMock) as mock_send, \
+             patch("app.api.routers.admin_auth.get_active_sources", new_callable=AsyncMock) as mock_sources:
+            mock_sources.return_value = [{"id": 1, "title": "Manba"}]
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                res = await client.post("/api/admin/logout")
+                assert res.status_code == 200
+                assert res.json() == {"ok": True}
+                mock_redis.delete.assert_called_once_with("admin_session:99999")
+                mock_send.assert_called_once()
+                assert mock_send.call_args[1]["chat_id"] == 99999
     finally:
         app.dependency_overrides.clear()

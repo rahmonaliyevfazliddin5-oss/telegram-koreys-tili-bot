@@ -1,9 +1,38 @@
+# Muhit o'zgaruvchilari (maxfiy ma'lumotlar)
 .env
+*.env
+!.env.example
+
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Test va keshlar
 .pytest_cache/
+.coverage
+htmlcov/
+
+# IDE va tahrirlovchilar
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# Docker va hajm papkalari
+caddy_data/
+caddy_config/
+caddy/data/
+caddy/config/
+postgres_data/
+redis_data/
+
+# Loglar va zaxira nusxalari
+logs/
+*.log
 backups/
+node_modules/
