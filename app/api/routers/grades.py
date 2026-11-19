@@ -49,6 +49,41 @@ async def get_grades(
     ]
 
 
+@router.get("/{grade_id}", response_model=GradeResponse)
+async def get_grade(
+    grade_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    stmt = (
+        select(
+            Grade.id,
+            Grade.student_id,
+            Grade.date,
+            Grade.value,
+            Grade.created_at,
+            (Student.first_name + " " + Student.last_name).label("student_name")
+        )
+        .join(Student, Grade.student_id == Student.id)
+        .where(Grade.id == grade_id)
+    )
+    result = await db.execute(stmt)
+    row = result.first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Baho topilmadi"
+        )
+    return GradeResponse(
+        id=row.id,
+        student_id=row.student_id,
+        date=row.date,
+        value=row.value,
+        created_at=row.created_at,
+        student_name=row.student_name
+    )
+
+
 @router.post("", response_model=GradeResponse, status_code=status.HTTP_201_CREATED)
 async def create_grade(
     payload: GradeCreate,
@@ -108,6 +143,9 @@ async def update_grade(
     await db.commit()
     await db.refresh(grade)
 
+    student = await db.get(Student, grade.student_id)
+    student_name = f"{student.first_name} {student.last_name}" if student else None
+
     # Reyting keshini tozalash
     await invalidate_rating_cache()
 
@@ -116,7 +154,8 @@ async def update_grade(
         student_id=grade.student_id,
         date=grade.date,
         value=grade.value,
-        created_at=grade.created_at
+        created_at=grade.created_at,
+        student_name=student_name
     )
 
 

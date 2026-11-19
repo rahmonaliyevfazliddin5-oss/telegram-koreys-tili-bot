@@ -54,7 +54,7 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
             detail="Telegram imzosini tekshirish muvaffaqiyatsiz tugadi"
         )
 
-    # 4. auth_date 24 soatdan (86400 soniya) eski bo'lmasligi kerak
+    # 4. auth_date 24 soatdan (86400 soniya) eski bo'lmasligi kerak va kelajakdagi soxta sana bo'lmasligi kerak
     auth_date_str = parsed_data.get("auth_date")
     if not auth_date_str or not auth_date_str.isdigit():
         raise HTTPException(
@@ -68,6 +68,11 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Autentifikatsiya muddati tugagan (24 soatdan ortiq)"
+        )
+    if auth_date > current_timestamp + 300:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autentifikatsiya sanasi yaroqsiz"
         )
 
     # 5. user ma'lumotlarini JSON dan o'qish
@@ -93,9 +98,17 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
             detail="Telegram foydalanuvchi ID raqami mavjud emas"
         )
 
+    try:
+        user_id_int = int(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Telegram foydalanuvchi ID raqami yaroqsiz"
+        )
+
     return {
-        "user_id": int(user_id),
-        "first_name": user_data.get("first_name", ""),
-        "last_name": user_data.get("last_name", ""),
-        "username": user_data.get("username", "")
+        "user_id": user_id_int,
+        "first_name": str(user_data.get("first_name", "")),
+        "last_name": str(user_data.get("last_name", "")),
+        "username": str(user_data.get("username", ""))
     }

@@ -30,6 +30,16 @@ async def admin_start(message: Message, state: FSMContext):
         )
         return
 
+    # Faol admin sessiyasi mavjud bo'lsa darhol klaviaturani ko'rsatish
+    session_key = f"admin_session:{user_id}"
+    if await redis_client.get(session_key):
+        await state.clear()
+        await message.answer(
+            get_text("admin_panel_title"),
+            reply_markup=get_admin_webapp_keyboard()
+        )
+        return
+
     # Kod so'rash
     await state.set_state(AdminState.waiting_for_code)
     await message.answer(get_text("admin_prompt_code"))

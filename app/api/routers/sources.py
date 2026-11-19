@@ -23,6 +23,24 @@ async def get_sources(
     return result.scalars().all()
 
 
+@router.get("/{source_id}", response_model=SourceResponse)
+async def get_source(
+    source_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    stmt = select(Source).where(Source.id == source_id)
+    result = await db.execute(stmt)
+    source = result.scalar_one_or_none()
+
+    if not source:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Manba topilmadi"
+        )
+    return source
+
+
 @router.post("", response_model=SourceResponse, status_code=status.HTTP_201_CREATED)
 async def create_source(
     payload: SourceCreate,

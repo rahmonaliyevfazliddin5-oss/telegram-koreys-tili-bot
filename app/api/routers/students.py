@@ -35,6 +35,24 @@ async def get_students(
     return result.scalars().all()
 
 
+@router.get("/{student_id}", response_model=StudentResponse)
+async def get_student(
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    stmt = select(Student).where(Student.id == student_id)
+    result = await db.execute(stmt)
+    student = result.scalar_one_or_none()
+
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="O'quvchi topilmadi"
+        )
+    return student
+
+
 @router.post("", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 async def create_student(
     payload: StudentCreate,

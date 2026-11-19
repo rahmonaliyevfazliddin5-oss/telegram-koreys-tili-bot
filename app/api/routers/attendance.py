@@ -1,6 +1,6 @@
 from datetime import date
-from typing import List
-from fastapi import APIRouter, Depends, Query, status
+from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy import select, and_, delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,12 +51,43 @@ async def get_attendance(
     return items
 
 
+@router.get("/{student_id}")
+async def get_student_attendance(
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    stmt = select(Student).where(Student.id == student_id)
+    student = (await db.execute(stmt)).scalar_one_or_none()
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="O'quvchi topilmadi"
+        )
+    att_stmt = select(Attendance).where(Attendance.student_id == student_id).order_by(Attendance.date.desc())
+    records = (await db.execute(att_stmt)).scalars().all()
+    return [
+        {"id": r.id, "student_id": r.student_id, "date": str(r.date), "status": r.status}
+        for r in records
+    ]
+
+
 @router.put("", status_code=status.HTTP_200_OK)
+@router.post("", status_code=status.HTTP_200_OK)
 async def set_attendance(
     payload: AttendanceUpdate,
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_current_admin)
 ):
+    # O'quvchi mavjudligini tekshirish
+    stmt_student = select(Student).where(Student.id == payload.student_id)
+    student_res = await db.execute(stmt_student)
+    if not student_res.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="O'quvchi topilmadi"
+        )
+
     # Agar status null bo'lsa, davomat belgisini o'chirish
     if payload.status is None:
         stmt = delete(Attendance).where(
