@@ -9,25 +9,24 @@
 </head>
 <body>
 
-  <!-- Yuqori qism: X tugmasi va sarlavha -->
+  <!-- Yuqori qism (Header) -->
   <header class="app-header">
-    <div class="header-left">
-      <div class="admin-badge">Admin</div>
-      <div class="header-title" id="headerTitle">Boshqaruv Paneli</div>
+    <div class="header-inner">
+      <div class="header-title" id="headerTitle">Admin Paneli</div>
+      <button class="header-close-btn" id="btnClose" aria-label="Yopish">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
     </div>
-    <button class="close-btn" id="btnClose" aria-label="Yopish">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    </button>
   </header>
 
   <!-- 401: Ruxsat yo'q ekrani -->
   <div id="unauthorizedView" class="view hidden">
     <div class="unauthorized-box">
       <div class="unauthorized-icon-wrap">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
         </svg>
@@ -43,142 +42,152 @@
 
     <!-- 1. O'quvchilar bo'limi -->
     <section id="tabStudents" class="tab-content active">
-      <div class="section-card">
-        <div class="section-actions">
-          <div class="search-wrap">
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      <div class="search-container">
+        <div class="search-box">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="studentSearchInput" class="search-input" placeholder="Qidiruv (ism, familiya, sinf)...">
+          <button id="btnClearSearch" class="search-clear-btn hidden" aria-label="Tozalash">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="15" y1="9" x2="9" y2="15"></line>
+              <line x1="9" y1="9" x2="15" y2="15"></line>
             </svg>
-            <input type="text" id="studentSearchInput" class="input-field search-input" placeholder="Qidiruv (ism, familiya, sinf)...">
-            <button id="btnClearSearch" class="btn-clear hidden" aria-label="Tozalash">&times;</button>
-          </div>
-          <button class="btn btn-primary btn-action" id="btnOpenAddStudent">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>Qo'shish</span>
           </button>
-        </div>
-
-        <div class="stats-bar">
-          <span class="stats-chip" id="studentsCount">Yuklanmoqda...</span>
         </div>
       </div>
 
       <div id="studentsLoader" class="loader-wrap hidden">
-        <div class="spinner"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
       </div>
       <div id="studentsList" class="items-list"></div>
     </section>
 
     <!-- 2. Davomat bo'limi -->
     <section id="tabAttendance" class="tab-content">
-      <div class="section-card">
-        <div class="date-control-bar">
-          <button class="btn-icon" id="btnAttendancePrev" aria-label="Oldingi kun">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Kalendar kartasi -->
+      <div class="calendar-card">
+        <div class="calendar-header">
+          <button class="cal-nav-btn" id="btnAttCalPrev" aria-label="Oldingi oy">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
           </button>
-          <div class="date-picker-wrap">
-            <input type="date" id="attendanceDate" class="input-field date-input">
-          </div>
-          <button class="btn-icon" id="btnAttendanceNext" aria-label="Keyingi kun">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="cal-month-title" id="attCalMonthTitle">Noyabr 2026</div>
+          <button class="cal-nav-btn" id="btnAttCalNext" aria-label="Keyingi oy">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </button>
-          <button class="btn-chip" id="btnAttendanceToday">Bugun</button>
         </div>
 
-        <div class="stats-bar attendance-summary">
-          <span class="stats-chip" id="attTotal">Jami: 0</span>
-          <span class="stats-chip chip-present" id="attPresent">Kelgan: 0</span>
-          <span class="stats-chip chip-absent" id="attAbsent">Kelmadi: 0</span>
+        <div class="calendar-weekdays">
+          <div>D</div><div>S</div><div>CH</div><div>P</div><div>J</div><div>SH</div><div>Y</div>
+        </div>
+
+        <div class="calendar-grid" id="attCalendarGrid"></div>
+
+        <div class="calendar-legend">
+          <div class="legend-item">
+            <span class="legend-dot dot-green"></span>
+            <span>Keldi</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot dot-red"></span>
+            <span>Kelmadi</span>
+          </div>
         </div>
       </div>
 
+      <!-- Tanlangan sana sarlavhasi va statistikasi -->
+      <div class="date-summary-bar">
+        <div class="date-summary-title" id="attSelectedDateTitle">Bugun</div>
+        <div class="date-summary-stat" id="attSummaryStat">Keldi: 0 / 0</div>
+      </div>
+
       <div id="attendanceLoader" class="loader-wrap hidden">
-        <div class="spinner"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
       </div>
       <div id="attendanceList" class="items-list"></div>
     </section>
 
     <!-- 3. Baholash bo'limi -->
     <section id="tabGrades" class="tab-content">
-      <div class="section-card">
-        <div class="date-control-bar">
-          <button class="btn-icon" id="btnGradePrev" aria-label="Oldingi kun">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Kalendar kartasi -->
+      <div class="calendar-card">
+        <div class="calendar-header">
+          <button class="cal-nav-btn" id="btnGradeCalPrev" aria-label="Oldingi oy">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
           </button>
-          <div class="date-picker-wrap">
-            <input type="date" id="gradeDate" class="input-field date-input">
-          </div>
-          <button class="btn-icon" id="btnGradeNext" aria-label="Keyingi kun">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="cal-month-title" id="gradeCalMonthTitle">Noyabr 2026</div>
+          <button class="cal-nav-btn" id="btnGradeCalNext" aria-label="Keyingi oy">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </button>
-          <button class="btn-chip" id="btnGradeToday">Bugun</button>
-          <button class="btn btn-primary btn-action" id="btnOpenAddGrade">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>Baho</span>
-          </button>
         </div>
 
-        <div class="stats-bar grades-summary">
-          <span class="stats-chip" id="gradesTotal">Jami: 0</span>
-          <span class="stats-chip chip-avg" id="gradesAvg">O'rtacha: -</span>
+        <div class="calendar-weekdays">
+          <div>D</div><div>S</div><div>CH</div><div>P</div><div>J</div><div>SH</div><div>Y</div>
+        </div>
+
+        <div class="calendar-grid" id="gradeCalendarGrid"></div>
+
+        <div class="calendar-legend">
+          <div class="legend-item">
+            <span class="legend-dot dot-green"></span>
+            <span>Baho qo'yilgan</span>
+          </div>
         </div>
       </div>
 
+      <!-- Tanlangan sana sarlavhasi -->
+      <div class="date-summary-bar">
+        <div class="date-summary-title" id="gradeSelectedDateTitle">Bugun</div>
+        <div class="date-summary-stat" id="gradeSummaryStat">Baholangan: 0</div>
+      </div>
+
       <div id="gradesLoader" class="loader-wrap hidden">
-        <div class="spinner"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
       </div>
       <div id="gradesList" class="items-list"></div>
     </section>
 
     <!-- 4. Manbalar bo'limi -->
     <section id="tabSources" class="tab-content">
-      <div class="section-card">
-        <div class="section-actions flex-between">
-          <div class="section-info-wrap">
-            <div class="section-title">O'quv manbalari</div>
-            <div class="section-desc">Ko'p tilli dars materiallari va manbalar</div>
-          </div>
-          <button class="btn btn-primary btn-action" id="btnOpenAddSource">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>Qo'shish</span>
-          </button>
-        </div>
-      </div>
-
       <div id="sourcesLoader" class="loader-wrap hidden">
-        <div class="spinner"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
       </div>
       <div id="sourcesList" class="items-list"></div>
     </section>
 
   </main>
 
+  <!-- Suzuvchi "+" (FAB) tugmasi -->
+  <button class="floating-add-btn" id="fabAdd" aria-label="Qo'shish">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  </button>
+
   <!-- Pastki menyu (Tablar) -->
   <nav class="bottom-nav" id="bottomNav">
     <button class="nav-item active" data-tab="tabStudents">
       <div class="nav-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
           <circle cx="9" cy="7" r="4"></circle>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
           <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
         </svg>
       </div>
@@ -186,7 +195,7 @@
     </button>
     <button class="nav-item" data-tab="tabAttendance">
       <div class="nav-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
           <line x1="16" y1="2" x2="16" y2="6"></line>
           <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -198,7 +207,7 @@
     </button>
     <button class="nav-item" data-tab="tabGrades">
       <div class="nav-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
         </svg>
       </div>
@@ -206,26 +215,110 @@
     </button>
     <button class="nav-item" data-tab="tabSources">
       <div class="nav-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          <line x1="8" y1="7" x2="16" y2="7"></line>
-          <line x1="8" y1="11" x2="14" y2="11"></line>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
         </svg>
       </div>
       <span class="nav-label">Manbalar</span>
     </button>
   </nav>
 
-  <!-- Modal: O'quvchi qo'shish / tahrirlash -->
-  <div id="modalStudent" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
+  <!-- Bottom Sheet: O'quvchi amallari (Tahrirlash / O'chirish) -->
+  <div id="sheetStudentActions" class="bottom-sheet-overlay hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
       <div class="sheet-handle"></div>
+      <div class="sheet-student-info">
+        <div class="sheet-avatar" id="sheetStudentAvatar">AV</div>
+        <div class="sheet-info-text">
+          <div class="sheet-student-name" id="sheetStudentName">Ism Familya</div>
+          <div class="sheet-student-grade" id="sheetStudentGrade">Sinf: 10-A</div>
+        </div>
+      </div>
+      <div class="sheet-actions-list">
+        <button class="sheet-action-btn" id="btnSheetEditStudent">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+          </svg>
+          <span>Tahrirlash</span>
+        </button>
+        <button class="sheet-action-btn text-danger" id="btnSheetDeleteStudent">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+          <span>O'chirish</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet: Baho qo'yish / tahrirlash -->
+  <div id="sheetGradeSelector" class="bottom-sheet-overlay hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title-center" id="sheetGradeStudentName">O'quvchi ismi</div>
+      <div class="sheet-subtitle-center">Baho (1 dan 5 gacha)</div>
+
+      <div class="grade-round-buttons">
+        <button type="button" class="btn-grade-round" data-val="1">1</button>
+        <button type="button" class="btn-grade-round" data-val="2">2</button>
+        <button type="button" class="btn-grade-round" data-val="3">3</button>
+        <button type="button" class="btn-grade-round" data-val="4">4</button>
+        <button type="button" class="btn-grade-round val-5" data-val="5">5</button>
+      </div>
+
+      <div class="sheet-single-action" id="wrapGradeDeleteBtn">
+        <button class="sheet-action-btn text-danger justify-center" id="btnGradeDelete">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+          </svg>
+          <span>O'chirish</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet: Manba amallari (Tahrirlash / O'chirish) -->
+  <div id="sheetSourceActions" class="bottom-sheet-overlay hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title-center" id="sheetSourceTitle">Manba sarlavhasi</div>
+      <div class="sheet-actions-list">
+        <button class="sheet-action-btn" id="btnSheetEditSource">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+          </svg>
+          <span>Tahrirlash</span>
+        </button>
+        <button class="sheet-action-btn text-danger" id="btnSheetDeleteSource">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+          <span>O'chirish</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: O'quvchi qo'shish / tahrirlash formasi -->
+  <div id="modalStudent" class="modal-overlay hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title" id="modalStudentTitle">O'quvchi qo'shish</div>
-        <button class="modal-close" id="btnCloseStudentModal" aria-label="Yopish">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <button class="modal-close-btn" id="btnCloseStudentModal" aria-label="Yopish">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -235,70 +328,29 @@
         <input type="hidden" id="studentId">
         <div class="form-group">
           <label for="studentFirstName">Ism</label>
-          <input type="text" id="studentFirstName" class="input-field" placeholder="Masalan: Sardor" required maxlength="100">
+          <input type="text" id="studentFirstName" class="form-input" required maxlength="100">
         </div>
         <div class="form-group">
           <label for="studentLastName">Familiya</label>
-          <input type="text" id="studentLastName" class="input-field" placeholder="Masalan: Karimov" required maxlength="100">
+          <input type="text" id="studentLastName" class="form-input" required maxlength="100">
         </div>
         <div class="form-group">
-          <label for="studentGrade">Sinf yoki guruh</label>
-          <input type="text" id="studentGrade" class="input-field" placeholder="Masalan: 10-A" required maxlength="50">
+          <label for="studentGrade">Sinf</label>
+          <input type="text" id="studentGrade" class="form-input" required maxlength="50">
         </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary btn-block" id="btnSaveStudent">Saqlash</button>
-        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnSaveStudent">Saqlash</button>
       </form>
     </div>
   </div>
 
-  <!-- Modal: Baho qo'yish / tahrirlash -->
-  <div id="modalGrade" class="modal hidden" role="dialog" aria-modal="true">
+  <!-- Modal: Manba qo'shish / tahrirlash formasi -->
+  <div id="modalSource" class="modal-overlay hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <div class="sheet-handle"></div>
-      <div class="modal-header">
-        <div class="modal-title" id="modalGradeTitle">Baho qo'yish</div>
-        <button class="modal-close" id="btnCloseGradeModal" aria-label="Yopish">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      <form id="formGrade">
-        <input type="hidden" id="gradeId">
-        <div class="form-group" id="gradeStudentSelectGroup">
-          <label for="gradeStudentSelect">O'quvchini tanlang</label>
-          <select id="gradeStudentSelect" class="input-field select-field" required></select>
-        </div>
-        <div class="form-group">
-          <label>Baho (1 dan 5 gacha)</label>
-          <div class="grade-buttons" id="gradeButtons">
-            <button type="button" class="btn-grade" data-val="1">1</button>
-            <button type="button" class="btn-grade" data-val="2">2</button>
-            <button type="button" class="btn-grade" data-val="3">3</button>
-            <button type="button" class="btn-grade" data-val="4">4</button>
-            <button type="button" class="btn-grade active" data-val="5">5</button>
-          </div>
-          <input type="hidden" id="gradeValue" value="5">
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary btn-block" id="btnSaveGrade">Saqlash</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal: Manba qo'shish / tahrirlash -->
-  <div id="modalSource" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <div class="sheet-handle"></div>
+    <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title" id="modalSourceTitle">Manba qo'shish</div>
-        <button class="modal-close" id="btnCloseSourceModal" aria-label="Yopish">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <button class="modal-close-btn" id="btnCloseSourceModal" aria-label="Yopish">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -306,81 +358,90 @@
       </div>
       <form id="formSource">
         <input type="hidden" id="sourceId">
+
+        <!-- Qo'shish maydonlari -->
         <div id="sourceAddFields">
           <div class="form-group">
             <label for="sourceLang">Kiritish tili</label>
-            <select id="sourceLang" class="input-field select-field">
+            <select id="sourceLang" class="form-select">
               <option value="uz">O'zbekcha</option>
               <option value="en">English</option>
               <option value="ru">Русский</option>
             </select>
-            <div class="form-hint">Kiritilgan matn boshqa tillarga avtomatik tarjima qilinadi.</div>
           </div>
           <div class="form-group">
             <label for="sourceTitle">Sarlavha</label>
-            <input type="text" id="sourceTitle" class="input-field" placeholder="Mavzu yoki manba sarlavhasi" maxlength="255">
+            <input type="text" id="sourceTitle" class="form-input" maxlength="255">
           </div>
           <div class="form-group">
-            <label for="sourceText">Matn / Tavsif</label>
-            <textarea id="sourceText" class="input-field textarea" rows="4" placeholder="Manba haqida batafsil ma'lumot..."></textarea>
+            <label for="sourceText">Matn</label>
+            <textarea id="sourceText" class="form-textarea" rows="4"></textarea>
           </div>
         </div>
 
+        <!-- Tahrirlash maydonlari: UZ | EN | RU tablari -->
         <div id="sourceEditFields" class="hidden">
-          <div class="lang-section-label">O'zbek tili</div>
-          <div class="form-group">
-            <label for="sourceTitleUz">Sarlavha (UZ)</label>
-            <input type="text" id="sourceTitleUz" class="input-field">
-          </div>
-          <div class="form-group">
-            <label for="sourceTextUz">Matn (UZ)</label>
-            <textarea id="sourceTextUz" class="input-field textarea" rows="2"></textarea>
+          <div class="lang-tab-bar">
+            <button type="button" class="lang-tab-item active" data-lang="uz">UZ</button>
+            <button type="button" class="lang-tab-item" data-lang="en">EN</button>
+            <button type="button" class="lang-tab-item" data-lang="ru">RU</button>
           </div>
 
-          <div class="lang-section-label">English</div>
-          <div class="form-group">
-            <label for="sourceTitleEn">Sarlavha (EN)</label>
-            <input type="text" id="sourceTitleEn" class="input-field">
-          </div>
-          <div class="form-group">
-            <label for="sourceTextEn">Matn (EN)</label>
-            <textarea id="sourceTextEn" class="input-field textarea" rows="2"></textarea>
+          <div class="lang-pane active" id="paneUz">
+            <div class="form-group">
+              <label for="sourceTitleUz">Sarlavha</label>
+              <input type="text" id="sourceTitleUz" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="sourceTextUz">Matn</label>
+              <textarea id="sourceTextUz" class="form-textarea" rows="4"></textarea>
+            </div>
           </div>
 
-          <div class="lang-section-label">Русский</div>
-          <div class="form-group">
-            <label for="sourceTitleRu">Sarlavha (RU)</label>
-            <input type="text" id="sourceTitleRu" class="input-field">
+          <div class="lang-pane" id="paneEn">
+            <div class="form-group">
+              <label for="sourceTitleEn">Sarlavha</label>
+              <input type="text" id="sourceTitleEn" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="sourceTextEn">Matn</label>
+              <textarea id="sourceTextEn" class="form-textarea" rows="4"></textarea>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="sourceTextRu">Matn (RU)</label>
-            <textarea id="sourceTextRu" class="input-field textarea" rows="2"></textarea>
+
+          <div class="lang-pane" id="paneRu">
+            <div class="form-group">
+              <label for="sourceTitleRu">Sarlavha</label>
+              <input type="text" id="sourceTitleRu" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="sourceTextRu">Matn</label>
+              <textarea id="sourceTextRu" class="form-textarea" rows="4"></textarea>
+            </div>
           </div>
         </div>
 
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary btn-block" id="btnSaveSource">Saqlash</button>
-        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnSaveSource">Saqlash</button>
       </form>
     </div>
   </div>
 
   <!-- In-App Tasdiqlash Modali (Confirm Modal) -->
-  <div id="modalConfirm" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="modalConfirm" class="modal-overlay hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-content confirm-modal-content">
+    <div class="modal-card confirm-card">
       <div class="confirm-icon-wrap">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18"></path>
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
         </svg>
       </div>
       <div class="confirm-title" id="confirmTitle">Tasdiqlang</div>
       <div class="confirm-message" id="confirmMessage">Bu amalni bajarishga ishonchingiz komilmi?</div>
       <div class="confirm-actions">
         <button type="button" class="btn btn-secondary" id="btnConfirmCancel">Bekor qilish</button>
-        <button type="button" class="btn btn-danger" id="btnConfirmOk">Tasdiqlash</button>
+        <button type="button" class="btn btn-danger" id="btnConfirmOk">O'chirish</button>
       </div>
     </div>
   </div>

@@ -9,13 +9,13 @@ if (tg) {
       tg.enableClosingConfirmation();
     }
     if (typeof tg.setHeaderColor === "function") {
-      tg.setHeaderColor("#151b26");
+      tg.setHeaderColor("#4F46E5");
     }
     if (typeof tg.setBackgroundColor === "function") {
-      tg.setBackgroundColor("#0b0e14");
+      tg.setBackgroundColor("#F4F6FA");
     }
   } catch (e) {
-    console.warn("Telegram WebApp sozlamalarini yuklashda xatolik:", e);
+    console.warn("Telegram WebApp sozlamalarida xatolik:", e);
   }
 }
 
@@ -41,7 +41,7 @@ const haptic = {
 // Telegram orqaga (BackButton) boshqaruvi
 function updateBackButton() {
   if (!tg?.BackButton) return;
-  const anyOpenModal = document.querySelector(".modal:not(.hidden)");
+  const anyOpenModal = document.querySelector(".modal-overlay:not(.hidden), .bottom-sheet-overlay:not(.hidden)");
   if (anyOpenModal) {
     tg.BackButton.show();
   } else {
@@ -51,18 +51,17 @@ function updateBackButton() {
 
 if (tg?.BackButton) {
   tg.BackButton.onClick(() => {
-    closeAllModals();
+    closeAllSheetsAndModals();
   });
 }
 
-// X tugmasi bosilganda Mini App'ni yopish
+// Yopish tugmasi
 document.getElementById("btnClose")?.addEventListener("click", () => {
   haptic.impact("light");
   if (tg) {
     tg.close();
   }
 });
-
 document.getElementById("btnUnauthorizedClose")?.addEventListener("click", () => {
   haptic.impact("light");
   if (tg) {
@@ -81,7 +80,6 @@ function showToast(message, type = "info") {
 
   container.appendChild(toast);
 
-  // Animatsiyali ko'rsatish
   requestAnimationFrame(() => {
     toast.classList.add("toast-show");
   });
@@ -92,7 +90,7 @@ function showToast(message, type = "info") {
       if (toast.parentNode) {
         toast.parentNode.removeChild(toast);
       }
-    }, 280);
+    }, 250);
   }, 2500);
 }
 
@@ -138,23 +136,24 @@ function confirmAction(message, title = "Tasdiqlang") {
   });
 }
 
-// Barcha modallarni yopish
-function closeAllModals() {
-  document.querySelectorAll(".modal").forEach((m) => {
-    m.classList.add("hidden");
+// Barcha modal va bottom sheetlarni yopish
+function closeAllSheetsAndModals() {
+  document.querySelectorAll(".modal-overlay, .bottom-sheet-overlay").forEach((el) => {
+    el.classList.add("hidden");
   });
   updateBackButton();
 }
 
-// Modal orqa fonini bosganda yopish
-document.querySelectorAll(".modal").forEach((modal) => {
-  modal.addEventListener("click", (e) => {
+// Backdrop yoki tutqichni bosganda yopish
+document.querySelectorAll(".bottom-sheet-overlay, .modal-overlay").forEach((overlay) => {
+  overlay.addEventListener("click", (e) => {
     if (
+      e.target.classList.contains("bottom-sheet-backdrop") ||
       e.target.classList.contains("modal-backdrop") ||
       e.target.classList.contains("sheet-handle")
     ) {
       haptic.impact("light");
-      closeAllModals();
+      closeAllSheetsAndModals();
     }
   });
 });
@@ -196,12 +195,23 @@ async function apiRequest(endpoint, options = {}) {
 function showUnauthorized() {
   document.getElementById("mainApp")?.classList.add("hidden");
   document.getElementById("bottomNav")?.classList.add("hidden");
+  document.getElementById("fabAdd")?.classList.add("hidden");
   document.getElementById("unauthorizedView")?.classList.remove("hidden");
 }
 
 // Tablarni almashtirish
 const navItems = document.querySelectorAll(".nav-item");
 const tabContents = document.querySelectorAll(".tab-content");
+const fabAdd = document.getElementById("fabAdd");
+let currentTabId = "tabStudents";
+
+function updateFabVisibility() {
+  if (currentTabId === "tabStudents" || currentTabId === "tabSources") {
+    fabAdd?.classList.remove("hidden");
+  } else {
+    fabAdd?.classList.add("hidden");
+  }
+}
 
 navItems.forEach((item) => {
   item.addEventListener("click", () => {
@@ -211,17 +221,60 @@ navItems.forEach((item) => {
     tabContents.forEach((t) => t.classList.remove("active"));
 
     item.classList.add("active");
-    const tabId = item.getAttribute("data-tab");
-    document.getElementById(tabId)?.classList.add("active");
+    currentTabId = item.getAttribute("data-tab");
+    document.getElementById(currentTabId)?.classList.add("active");
 
-    if (tabId === "tabStudents") loadStudents();
-    if (tabId === "tabAttendance") loadAttendance();
-    if (tabId === "tabGrades") loadGrades();
-    if (tabId === "tabSources") loadSources();
+    updateFabVisibility();
+
+    if (currentTabId === "tabStudents") loadStudents();
+    if (currentTabId === "tabAttendance") {
+      renderAttendanceCalendar();
+      loadAttendance();
+    }
+    if (currentTabId === "tabGrades") {
+      renderGradesCalendar();
+      loadGrades();
+    }
+    if (currentTabId === "tabSources") loadSources();
   });
 });
 
-// Bugungi sanani formatlash (YYYY-MM-DD)
+// FAB bosilganda
+fabAdd?.addEventListener("click", () => {
+  haptic.impact("light");
+  if (currentTabId === "tabStudents") {
+    openAddStudentModal();
+  } else if (currentTabId === "tabSources") {
+    openAddSourceModal();
+  }
+});
+
+// Ism bosh harflaridan avatar uchun rang tanlash
+const AVATAR_COLORS = [
+  "linear-gradient(135deg, #4F46E5, #7C3AED)",
+  "linear-gradient(135deg, #2563EB, #38BDF8)",
+  "linear-gradient(135deg, #059669, #10B981)",
+  "linear-gradient(135deg, #D97706, #F59E0B)",
+  "linear-gradient(135deg, #DC2626, #F87171)",
+  "linear-gradient(135deg, #7C3AED, #C084FC)"
+];
+
+function getAvatarColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const idx = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
+
+function getInitials(first, last) {
+  const f = first ? first.charAt(0).toUpperCase() : "";
+  const l = last ? last.charAt(0).toUpperCase() : "";
+  return `${f}${l}` || "O";
+}
+
+// Sanalar formati
 function getTodayString() {
   const today = new Date();
   const y = today.getFullYear();
@@ -230,27 +283,32 @@ function getTodayString() {
   return `${y}-${m}-${d}`;
 }
 
-// Sanani siljitish (kunlar bo'yicha)
-function shiftDateString(dateStr, days) {
-  if (!dateStr) dateStr = getTodayString();
+const MONTH_NAMES_UZ = [
+  "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
+  "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"
+];
+
+function formatDisplayDate(dateStr) {
+  if (!dateStr) return "";
   const parts = dateStr.split("-");
-  const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-  dt.setDate(dt.getDate() + days);
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, "0");
-  const d = String(dt.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  return `${d}-${MONTH_NAMES_UZ[m].toLowerCase()} ${y}`;
 }
 
 // ----------------------------------------------------
 // 1. O'QUVCHILAR BO'LIMI
 // ----------------------------------------------------
 let allStudents = [];
+let selectedStudentForAction = null;
 const studentsListEl = document.getElementById("studentsList");
 const studentSearchInput = document.getElementById("studentSearchInput");
 const btnClearSearch = document.getElementById("btnClearSearch");
-const studentsCountEl = document.getElementById("studentsCount");
 const studentsLoaderEl = document.getElementById("studentsLoader");
+const sheetStudentActions = document.getElementById("sheetStudentActions");
+const modalStudent = document.getElementById("modalStudent");
+const formStudent = document.getElementById("formStudent");
 
 let searchDebounceTimeout = null;
 
@@ -268,7 +326,7 @@ async function loadStudents() {
   }
 }
 
-studentSearchInput.addEventListener("input", () => {
+studentSearchInput?.addEventListener("input", () => {
   if (studentSearchInput.value.length > 0) {
     btnClearSearch?.classList.remove("hidden");
   } else {
@@ -278,7 +336,7 @@ studentSearchInput.addEventListener("input", () => {
   clearTimeout(searchDebounceTimeout);
   searchDebounceTimeout = setTimeout(() => {
     loadStudents();
-  }, 260);
+  }, 240);
 });
 
 btnClearSearch?.addEventListener("click", () => {
@@ -291,19 +349,19 @@ btnClearSearch?.addEventListener("click", () => {
 function renderStudents() {
   studentsListEl.replaceChildren();
 
-  const total = allStudents ? allStudents.length : 0;
-  if (studentsCountEl) {
-    studentsCountEl.textContent = `Jami: ${total} ta o'quvchi`;
-  }
-
   if (!allStudents || allStudents.length === 0) {
     const emptyCard = document.createElement("div");
     emptyCard.className = "empty-card";
+
+    const emptyIcon = document.createElement("div");
+    emptyIcon.className = "empty-icon-wrap";
+    emptyIcon.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
 
     const emptyTitle = document.createElement("div");
     emptyTitle.className = "empty-title";
     emptyTitle.textContent = "O'quvchilar topilmadi";
 
+    emptyCard.appendChild(emptyIcon);
     emptyCard.appendChild(emptyTitle);
     studentsListEl.appendChild(emptyCard);
     return;
@@ -313,76 +371,103 @@ function renderStudents() {
     const card = document.createElement("div");
     card.className = "card";
 
+    const cardLeft = document.createElement("div");
+    cardLeft.className = "card-left";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.style.background = getAvatarColor(`${st.first_name} ${st.last_name}`);
+    avatar.textContent = getInitials(st.first_name, st.last_name);
+
     const info = document.createElement("div");
     info.className = "card-info";
-
-    const titleRow = document.createElement("div");
-    titleRow.className = "card-title-row";
 
     const title = document.createElement("div");
     title.className = "card-title";
     title.textContent = `${st.first_name} ${st.last_name}`;
 
-    const badge = document.createElement("span");
-    badge.className = "card-badge";
-    badge.textContent = st.grade;
-
-    titleRow.appendChild(title);
-    titleRow.appendChild(badge);
-
     const subtitle = document.createElement("div");
     subtitle.className = "card-subtitle";
-    subtitle.textContent = `ID: #${st.id}`;
+    subtitle.textContent = `Sinf: ${st.grade}`;
 
-    info.appendChild(titleRow);
+    info.appendChild(title);
     info.appendChild(subtitle);
 
-    const actions = document.createElement("div");
-    actions.className = "card-actions";
+    cardLeft.appendChild(avatar);
+    cardLeft.appendChild(info);
 
-    const btnEdit = document.createElement("button");
-    btnEdit.className = "btn btn-secondary btn-sm";
-    btnEdit.textContent = "Tahrirlash";
-    btnEdit.onclick = () => {
+    const chevron = document.createElement("div");
+    chevron.className = "card-chevron";
+    chevron.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+
+    card.appendChild(cardLeft);
+    card.appendChild(chevron);
+
+    card.onclick = () => {
       haptic.impact("light");
-      openEditStudentModal(st);
+      openStudentActionSheet(st);
     };
 
-    const btnDel = document.createElement("button");
-    btnDel.className = "btn btn-danger btn-sm";
-    btnDel.textContent = "O'chirish";
-    btnDel.onclick = () => {
-      deleteStudent(st.id, `${st.first_name} ${st.last_name}`);
-    };
-
-    actions.appendChild(btnEdit);
-    actions.appendChild(btnDel);
-
-    card.appendChild(info);
-    card.appendChild(actions);
     studentsListEl.appendChild(card);
   });
 }
 
-const modalStudent = document.getElementById("modalStudent");
-const formStudent = document.getElementById("formStudent");
+function openStudentActionSheet(st) {
+  selectedStudentForAction = st;
+  const avatarEl = document.getElementById("sheetStudentAvatar");
+  const nameEl = document.getElementById("sheetStudentName");
+  const gradeEl = document.getElementById("sheetStudentGrade");
 
-document.getElementById("btnOpenAddStudent").onclick = () => {
+  if (avatarEl) {
+    avatarEl.style.background = getAvatarColor(`${st.first_name} ${st.last_name}`);
+    avatarEl.textContent = getInitials(st.first_name, st.last_name);
+  }
+  if (nameEl) nameEl.textContent = `${st.first_name} ${st.last_name}`;
+  if (gradeEl) gradeEl.textContent = `Sinf: ${st.grade}`;
+
+  sheetStudentActions?.classList.remove("hidden");
+  updateBackButton();
+}
+
+document.getElementById("btnSheetEditStudent")?.addEventListener("click", () => {
   haptic.impact("light");
+  sheetStudentActions?.classList.add("hidden");
+  if (selectedStudentForAction) {
+    openEditStudentModal(selectedStudentForAction);
+  }
+});
+
+document.getElementById("btnSheetDeleteStudent")?.addEventListener("click", async () => {
+  haptic.impact("medium");
+  sheetStudentActions?.classList.add("hidden");
+  updateBackButton();
+
+  if (!selectedStudentForAction) return;
+  const name = `${selectedStudentForAction.first_name} ${selectedStudentForAction.last_name}`;
+  const confirmed = await confirmAction(
+    `"${name}" o'quvchisini ro'yxatdan o'chirishni tasdiqlaysizmi?`,
+    "O'chirish"
+  );
+
+  if (confirmed) {
+    try {
+      await apiRequest(`/api/students/${selectedStudentForAction.id}`, { method: "DELETE" });
+      haptic.notification("success");
+      showToast("O'quvchi o'chirildi", "success");
+      loadStudents();
+    } catch (err) {}
+  }
+});
+
+function openAddStudentModal() {
   document.getElementById("modalStudentTitle").textContent = "O'quvchi qo'shish";
   document.getElementById("studentId").value = "";
   document.getElementById("studentFirstName").value = "";
   document.getElementById("studentLastName").value = "";
   document.getElementById("studentGrade").value = "";
-  modalStudent.classList.remove("hidden");
+  modalStudent?.classList.remove("hidden");
   updateBackButton();
-};
-
-document.getElementById("btnCloseStudentModal").onclick = () => {
-  haptic.impact("light");
-  modalStudent.classList.add("hidden");
-  updateBackButton();
-};
+}
 
 function openEditStudentModal(st) {
   document.getElementById("modalStudentTitle").textContent = "O'quvchini tahrirlash";
@@ -390,11 +475,17 @@ function openEditStudentModal(st) {
   document.getElementById("studentFirstName").value = st.first_name;
   document.getElementById("studentLastName").value = st.last_name;
   document.getElementById("studentGrade").value = st.grade;
-  modalStudent.classList.remove("hidden");
+  modalStudent?.classList.remove("hidden");
   updateBackButton();
 }
 
-formStudent.onsubmit = async (e) => {
+document.getElementById("btnCloseStudentModal")?.addEventListener("click", () => {
+  haptic.impact("light");
+  modalStudent?.classList.add("hidden");
+  updateBackButton();
+});
+
+formStudent?.addEventListener("submit", async (e) => {
   e.preventDefault();
   haptic.impact("medium");
 
@@ -420,78 +511,124 @@ formStudent.onsubmit = async (e) => {
     }
 
     haptic.notification("success");
-    modalStudent.classList.add("hidden");
+    modalStudent?.classList.add("hidden");
     updateBackButton();
     loadStudents();
   } catch (err) {
-    // Xatolik apiRequest ichida toast ko'rsatiladi
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = origText;
   }
-};
+});
 
-async function deleteStudent(id, name) {
-  const confirmed = await confirmAction(
-    `"${name}" o'quvchisini ro'yxatdan o'chirishni tasdiqlaysizmi?`,
-    "O'quvchini o'chirish"
-  );
+// ----------------------------------------------------
+// 2. DAVOMAT BO'LIMI VA KALENDAR
+// ----------------------------------------------------
+let currentAttDate = getTodayString();
+let currentAttCalYear = new Date().getFullYear();
+let currentAttCalMonth = new Date().getMonth(); // 0..11
+let attendanceMonthCache = {}; // dateStr -> { has_present: bool, has_absent: bool }
 
-  if (confirmed) {
-    try {
-      await apiRequest(`/api/students/${id}`, { method: "DELETE" });
-      haptic.notification("success");
-      showToast("O'quvchi o'chirildi", "success");
-      loadStudents();
-    } catch (err) {}
+const attendanceListEl = document.getElementById("attendanceList");
+const attendanceLoaderEl = document.getElementById("attendanceLoader");
+const attCalMonthTitleEl = document.getElementById("attCalMonthTitle");
+const attCalendarGridEl = document.getElementById("attCalendarGrid");
+const attSelectedDateTitleEl = document.getElementById("attSelectedDateTitle");
+const attSummaryStatEl = document.getElementById("attSummaryStat");
+
+function renderAttendanceCalendar() {
+  if (!attCalendarGridEl) return;
+  attCalendarGridEl.replaceChildren();
+
+  if (attCalMonthTitleEl) {
+    attCalMonthTitleEl.textContent = `${MONTH_NAMES_UZ[currentAttCalMonth]} ${currentAttCalYear}`;
+  }
+
+  const firstDay = new Date(currentAttCalYear, currentAttCalMonth, 1).getDay();
+  // Haftani dushanbadan boshlash (0: Yakshanba -> 6, 1: Dushanba -> 0)
+  const startingDay = firstDay === 0 ? 6 : firstDay - 1;
+  const daysInMonth = new Date(currentAttCalYear, currentAttCalMonth + 1, 0).getDate();
+
+  // Bo'sh boshlang'ich kataklar
+  for (let i = 0; i < startingDay; i++) {
+    const emptySlot = document.createElement("div");
+    emptySlot.className = "cal-day empty";
+    attCalendarGridEl.appendChild(emptySlot);
+  }
+
+  const todayStr = getTodayString();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const mStr = String(currentAttCalMonth + 1).padStart(2, "0");
+    const dStr = String(day).padStart(2, "0");
+    const fullDate = `${currentAttCalYear}-${mStr}-${dStr}`;
+
+    const dayEl = document.createElement("div");
+    dayEl.className = "cal-day";
+    dayEl.textContent = String(day);
+
+    if (fullDate === todayStr) {
+      dayEl.classList.add("today");
+    }
+    if (fullDate === currentAttDate) {
+      dayEl.classList.add("selected");
+    }
+
+    // Nuqta ko'rsatish
+    const cachedInfo = attendanceMonthCache[fullDate];
+    if (cachedInfo) {
+      const dot = document.createElement("span");
+      dot.className = "cal-day-dot";
+      if (cachedInfo.has_absent) {
+        dot.classList.add("dot-red");
+      } else if (cachedInfo.has_present) {
+        dot.classList.add("dot-green");
+      }
+      dayEl.appendChild(dot);
+    }
+
+    dayEl.onclick = () => {
+      haptic.selection();
+      currentAttDate = fullDate;
+      renderAttendanceCalendar();
+      loadAttendance();
+    };
+
+    attCalendarGridEl.appendChild(dayEl);
   }
 }
 
-// ----------------------------------------------------
-// 2. DAVOMAT BO'LIMI
-// ----------------------------------------------------
-const attendanceDateInput = document.getElementById("attendanceDate");
-const attendanceListEl = document.getElementById("attendanceList");
-const attendanceLoaderEl = document.getElementById("attendanceLoader");
-const attTotalEl = document.getElementById("attTotal");
-const attPresentEl = document.getElementById("attPresent");
-const attAbsentEl = document.getElementById("attAbsent");
-
-const btnAttendancePrev = document.getElementById("btnAttendancePrev");
-const btnAttendanceNext = document.getElementById("btnAttendanceNext");
-const btnAttendanceToday = document.getElementById("btnAttendanceToday");
-
-attendanceDateInput.value = getTodayString();
-
-attendanceDateInput.onchange = () => {
-  haptic.selection();
-  loadAttendance();
-};
-
-btnAttendancePrev?.addEventListener("click", () => {
-  haptic.selection();
-  attendanceDateInput.value = shiftDateString(attendanceDateInput.value, -1);
-  loadAttendance();
+document.getElementById("btnAttCalPrev")?.addEventListener("click", () => {
+  haptic.impact("light");
+  currentAttCalMonth--;
+  if (currentAttCalMonth < 0) {
+    currentAttCalMonth = 11;
+    currentAttCalYear--;
+  }
+  renderAttendanceCalendar();
 });
 
-btnAttendanceNext?.addEventListener("click", () => {
-  haptic.selection();
-  attendanceDateInput.value = shiftDateString(attendanceDateInput.value, 1);
-  loadAttendance();
+document.getElementById("btnAttCalNext")?.addEventListener("click", () => {
+  haptic.impact("light");
+  currentAttCalMonth++;
+  if (currentAttCalMonth > 11) {
+    currentAttCalMonth = 0;
+    currentAttCalYear++;
+  }
+  renderAttendanceCalendar();
 });
 
-btnAttendanceToday?.addEventListener("click", () => {
-  haptic.selection();
-  attendanceDateInput.value = getTodayString();
-  loadAttendance();
-});
+let currentAttendanceItems = [];
 
 async function loadAttendance() {
   attendanceLoaderEl?.classList.remove("hidden");
-  const dt = attendanceDateInput.value || getTodayString();
+  if (attSelectedDateTitleEl) {
+    attSelectedDateTitleEl.textContent = formatDisplayDate(currentAttDate);
+  }
+
   try {
-    const items = await apiRequest(`/api/attendance?date=${dt}`);
-    renderAttendance(items, dt);
+    currentAttendanceItems = await apiRequest(`/api/attendance?date=${currentAttDate}`);
+    renderAttendanceList();
   } catch (e) {
     console.error("Davomatni yuklashda xato:", e);
   } finally {
@@ -499,145 +636,239 @@ async function loadAttendance() {
   }
 }
 
-function renderAttendance(items, dt) {
+function renderAttendanceList() {
   attendanceListEl.replaceChildren();
 
-  const total = items ? items.length : 0;
   let presentCount = 0;
   let absentCount = 0;
 
-  if (items && items.length > 0) {
-    items.forEach((it) => {
+  if (currentAttendanceItems) {
+    currentAttendanceItems.forEach((it) => {
       if (it.status === "present") presentCount++;
       if (it.status === "absent") absentCount++;
     });
   }
 
-  if (attTotalEl) attTotalEl.textContent = `Jami: ${total}`;
-  if (attPresentEl) attPresentEl.textContent = `Kelgan: ${presentCount}`;
-  if (attAbsentEl) attAbsentEl.textContent = `Kelmadi: ${absentCount}`;
+  const total = currentAttendanceItems ? currentAttendanceItems.length : 0;
+  if (attSummaryStatEl) {
+    attSummaryStatEl.textContent = `Keldi: ${presentCount} / ${total}`;
+  }
 
-  if (!items || items.length === 0) {
+  // Kalendar uchun nuqtani yangilash
+  if (presentCount > 0 || absentCount > 0) {
+    attendanceMonthCache[currentAttDate] = {
+      has_present: presentCount > 0,
+      has_absent: absentCount > 0
+    };
+    renderAttendanceCalendar();
+  }
+
+  if (!currentAttendanceItems || currentAttendanceItems.length === 0) {
     const emptyCard = document.createElement("div");
     emptyCard.className = "empty-card";
+
+    const emptyIcon = document.createElement("div");
+    emptyIcon.className = "empty-icon-wrap";
+    emptyIcon.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg>`;
 
     const emptyTitle = document.createElement("div");
     emptyTitle.className = "empty-title";
     emptyTitle.textContent = "O'quvchilar topilmadi";
 
+    emptyCard.appendChild(emptyIcon);
     emptyCard.appendChild(emptyTitle);
     attendanceListEl.appendChild(emptyCard);
     return;
   }
 
-  items.forEach((it) => {
+  currentAttendanceItems.forEach((it) => {
     const card = document.createElement("div");
     card.className = "card";
 
+    const cardLeft = document.createElement("div");
+    cardLeft.className = "card-left";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.style.background = getAvatarColor(`${it.first_name} ${it.last_name}`);
+    avatar.textContent = getInitials(it.first_name, it.last_name);
+
     const info = document.createElement("div");
     info.className = "card-info";
-
-    const titleRow = document.createElement("div");
-    titleRow.className = "card-title-row";
 
     const title = document.createElement("div");
     title.className = "card-title";
     title.textContent = `${it.first_name} ${it.last_name}`;
 
-    const badge = document.createElement("span");
-    badge.className = "card-badge";
-    badge.textContent = it.grade;
+    const subtitle = document.createElement("div");
+    subtitle.className = "card-subtitle";
+    subtitle.textContent = `Sinf: ${it.grade}`;
 
-    titleRow.appendChild(title);
-    titleRow.appendChild(badge);
+    info.appendChild(title);
+    info.appendChild(subtitle);
 
-    info.appendChild(titleRow);
+    cardLeft.appendChild(avatar);
+    cardLeft.appendChild(info);
 
-    const toggle = document.createElement("div");
-    toggle.className = "attendance-toggle";
+    // Katta holat tugmasi (Neytral -> Keldi -> Kelmadi -> Neytral)
+    const btnToggle = document.createElement("button");
+    btnToggle.className = "btn-attendance-toggle";
 
-    const btnPresent = document.createElement("button");
-    btnPresent.className = `btn-status present ${it.status === "present" ? "active" : ""}`;
-    btnPresent.textContent = "Keldi (+)";
-    btnPresent.onclick = () => {
-      haptic.impact("medium");
-      const nextStatus = it.status === "present" ? null : "present";
-      updateAttendanceStatus(it.student_id, dt, nextStatus);
+    if (it.status === "present") {
+      btnToggle.classList.add("state-present");
+      btnToggle.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>Keldi</span>`;
+    } else if (it.status === "absent") {
+      btnToggle.classList.add("state-absent");
+      btnToggle.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>Kelmadi</span>`;
+    } else {
+      btnToggle.textContent = "-";
+    }
+
+    btnToggle.onclick = (e) => {
+      e.stopPropagation();
+      let nextStatus = null;
+      if (!it.status) {
+        nextStatus = "present";
+        haptic.impact("light");
+      } else if (it.status === "present") {
+        nextStatus = "absent";
+        haptic.impact("medium");
+      } else {
+        nextStatus = null;
+        haptic.impact("light");
+      }
+
+      // Optimistik UI yangilanish
+      it.status = nextStatus;
+      renderAttendanceList();
+
+      // Backendga saqlash
+      updateAttendanceRecord(it.student_id, currentAttDate, nextStatus);
     };
 
-    const btnAbsent = document.createElement("button");
-    btnAbsent.className = `btn-status absent ${it.status === "absent" ? "active" : ""}`;
-    btnAbsent.textContent = "Kelmadi (-)";
-    btnAbsent.onclick = () => {
-      haptic.impact("medium");
-      const nextStatus = it.status === "absent" ? null : "absent";
-      updateAttendanceStatus(it.student_id, dt, nextStatus);
-    };
-
-    toggle.appendChild(btnPresent);
-    toggle.appendChild(btnAbsent);
-
-    card.appendChild(info);
-    card.appendChild(toggle);
+    card.appendChild(cardLeft);
+    card.appendChild(btnToggle);
     attendanceListEl.appendChild(card);
   });
 }
 
-async function updateAttendanceStatus(studentId, dt, status) {
+async function updateAttendanceRecord(studentId, dateStr, status) {
   try {
     await apiRequest("/api/attendance", {
       method: "PUT",
-      body: JSON.stringify({ student_id: studentId, date: dt, status: status })
+      body: JSON.stringify({ student_id: studentId, date: dateStr, status: status })
     });
-    haptic.notification("success");
-    loadAttendance();
-  } catch (err) {}
+  } catch (err) {
+    loadAttendance(); // Xatolik bo'lsa qayta yuklash
+  }
 }
 
 // ----------------------------------------------------
 // 3. BAHOLASH BO'LIMI
 // ----------------------------------------------------
-const gradeDateInput = document.getElementById("gradeDate");
+let currentGradeDate = getTodayString();
+let currentGradeCalYear = new Date().getFullYear();
+let currentGradeCalMonth = new Date().getMonth();
+let gradesMonthCache = {}; // dateStr -> bool (has_grades)
+
 const gradesListEl = document.getElementById("gradesList");
 const gradesLoaderEl = document.getElementById("gradesLoader");
-const gradesTotalEl = document.getElementById("gradesTotal");
-const gradesAvgEl = document.getElementById("gradesAvg");
+const gradeCalMonthTitleEl = document.getElementById("gradeCalMonthTitle");
+const gradeCalendarGridEl = document.getElementById("gradeCalendarGrid");
+const gradeSelectedDateTitleEl = document.getElementById("gradeSelectedDateTitle");
+const gradeSummaryStatEl = document.getElementById("gradeSummaryStat");
+const sheetGradeSelector = document.getElementById("sheetGradeSelector");
+const wrapGradeDeleteBtn = document.getElementById("wrapGradeDeleteBtn");
 
-const btnGradePrev = document.getElementById("btnGradePrev");
-const btnGradeNext = document.getElementById("btnGradeNext");
-const btnGradeToday = document.getElementById("btnGradeToday");
+function renderGradesCalendar() {
+  if (!gradeCalendarGridEl) return;
+  gradeCalendarGridEl.replaceChildren();
 
-gradeDateInput.value = getTodayString();
+  if (gradeCalMonthTitleEl) {
+    gradeCalMonthTitleEl.textContent = `${MONTH_NAMES_UZ[currentGradeCalMonth]} ${currentGradeCalYear}`;
+  }
 
-gradeDateInput.onchange = () => {
-  haptic.selection();
-  loadGrades();
-};
+  const firstDay = new Date(currentGradeCalYear, currentGradeCalMonth, 1).getDay();
+  const startingDay = firstDay === 0 ? 6 : firstDay - 1;
+  const daysInMonth = new Date(currentGradeCalYear, currentGradeCalMonth + 1, 0).getDate();
 
-btnGradePrev?.addEventListener("click", () => {
-  haptic.selection();
-  gradeDateInput.value = shiftDateString(gradeDateInput.value, -1);
-  loadGrades();
+  for (let i = 0; i < startingDay; i++) {
+    const emptySlot = document.createElement("div");
+    emptySlot.className = "cal-day empty";
+    gradeCalendarGridEl.appendChild(emptySlot);
+  }
+
+  const todayStr = getTodayString();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const mStr = String(currentGradeCalMonth + 1).padStart(2, "0");
+    const dStr = String(day).padStart(2, "0");
+    const fullDate = `${currentGradeCalYear}-${mStr}-${dStr}`;
+
+    const dayEl = document.createElement("div");
+    dayEl.className = "cal-day";
+    dayEl.textContent = String(day);
+
+    if (fullDate === todayStr) {
+      dayEl.classList.add("today");
+    }
+    if (fullDate === currentGradeDate) {
+      dayEl.classList.add("selected");
+    }
+
+    if (gradesMonthCache[fullDate]) {
+      const dot = document.createElement("span");
+      dot.className = "cal-day-dot dot-green";
+      dayEl.appendChild(dot);
+    }
+
+    dayEl.onclick = () => {
+      haptic.selection();
+      currentGradeDate = fullDate;
+      renderGradesCalendar();
+      loadGrades();
+    };
+
+    gradeCalendarGridEl.appendChild(dayEl);
+  }
+}
+
+document.getElementById("btnGradeCalPrev")?.addEventListener("click", () => {
+  haptic.impact("light");
+  currentGradeCalMonth--;
+  if (currentGradeCalMonth < 0) {
+    currentGradeCalMonth = 11;
+    currentGradeCalYear--;
+  }
+  renderGradesCalendar();
 });
 
-btnGradeNext?.addEventListener("click", () => {
-  haptic.selection();
-  gradeDateInput.value = shiftDateString(gradeDateInput.value, 1);
-  loadGrades();
+document.getElementById("btnGradeCalNext")?.addEventListener("click", () => {
+  haptic.impact("light");
+  currentGradeCalMonth++;
+  if (currentGradeCalMonth > 11) {
+    currentGradeCalMonth = 0;
+    currentGradeCalYear++;
+  }
+  renderGradesCalendar();
 });
 
-btnGradeToday?.addEventListener("click", () => {
-  haptic.selection();
-  gradeDateInput.value = getTodayString();
-  loadGrades();
-});
+let currentGrades = [];
+let selectedStudentForGrade = null;
+let selectedGradeRecord = null;
 
 async function loadGrades() {
   gradesLoaderEl?.classList.remove("hidden");
-  const dt = gradeDateInput.value || getTodayString();
+  if (gradeSelectedDateTitleEl) {
+    gradeSelectedDateTitleEl.textContent = formatDisplayDate(currentGradeDate);
+  }
+
   try {
-    const grades = await apiRequest(`/api/grades?date=${dt}`);
-    renderGrades(grades);
+    currentGrades = await apiRequest(`/api/grades?date=${currentGradeDate}`);
+    if (!allStudents || allStudents.length === 0) {
+      allStudents = await apiRequest("/api/students");
+    }
+    renderGradesList();
   } catch (e) {
     console.error("Baholarni yuklashda xato:", e);
   } finally {
@@ -645,216 +876,187 @@ async function loadGrades() {
   }
 }
 
-function renderGrades(grades) {
+function renderGradesList() {
   gradesListEl.replaceChildren();
 
-  const total = grades ? grades.length : 0;
-  let sum = 0;
-  if (grades && grades.length > 0) {
-    grades.forEach((g) => {
-      sum += g.value;
-    });
+  const totalGraded = currentGrades ? currentGrades.length : 0;
+  if (gradeSummaryStatEl) {
+    gradeSummaryStatEl.textContent = `Baholangan: ${totalGraded}`;
   }
 
-  if (gradesTotalEl) gradesTotalEl.textContent = `Jami baholar: ${total}`;
-  if (gradesAvgEl) {
-    gradesAvgEl.textContent = total > 0 ? `O'rtacha: ${(sum / total).toFixed(1)}` : "O'rtacha: -";
+  if (totalGraded > 0) {
+    gradesMonthCache[currentGradeDate] = true;
+    renderGradesCalendar();
   }
 
-  if (!grades || grades.length === 0) {
+  if (!allStudents || allStudents.length === 0) {
     const emptyCard = document.createElement("div");
     emptyCard.className = "empty-card";
-
     const emptyTitle = document.createElement("div");
     emptyTitle.className = "empty-title";
-    emptyTitle.textContent = "Tanlangan sanada baholar mavjud emas";
-
+    emptyTitle.textContent = "O'quvchilar topilmadi";
     emptyCard.appendChild(emptyTitle);
     gradesListEl.appendChild(emptyCard);
     return;
   }
 
-  grades.forEach((gr) => {
+  allStudents.forEach((st) => {
     const card = document.createElement("div");
     card.className = "card";
 
-    const pill = document.createElement("div");
-    pill.className = `grade-pill grade-val-${gr.value}`;
-    pill.textContent = String(gr.value);
+    const cardLeft = document.createElement("div");
+    cardLeft.className = "card-left";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.style.background = getAvatarColor(`${st.first_name} ${st.last_name}`);
+    avatar.textContent = getInitials(st.first_name, st.last_name);
 
     const info = document.createElement("div");
     info.className = "card-info";
 
     const title = document.createElement("div");
     title.className = "card-title";
-    title.textContent = gr.student_name || "O'quvchi";
+    title.textContent = `${st.first_name} ${st.last_name}`;
 
     const subtitle = document.createElement("div");
     subtitle.className = "card-subtitle";
-    subtitle.textContent = `Baho: ${gr.value} ball | Sana: ${gr.date}`;
+    subtitle.textContent = `Sinf: ${st.grade}`;
 
     info.appendChild(title);
     info.appendChild(subtitle);
 
-    const actions = document.createElement("div");
-    actions.className = "card-actions";
+    cardLeft.appendChild(avatar);
+    cardLeft.appendChild(info);
 
-    const btnEdit = document.createElement("button");
-    btnEdit.className = "btn btn-secondary btn-sm";
-    btnEdit.textContent = "Tahrirlash";
-    btnEdit.onclick = () => {
+    // Shu kundagi o'quvchining bahosini topish
+    const gradeObj = currentGrades.find((g) => g.student_id === st.id);
+
+    const gradeChip = document.createElement("div");
+    gradeChip.className = "grade-chip";
+
+    if (gradeObj) {
+      gradeChip.textContent = String(gradeObj.value);
+      gradeChip.classList.add("has-grade");
+      if (gradeObj.value === 5) {
+        gradeChip.classList.add("grade-5");
+      }
+    } else {
+      gradeChip.textContent = "-";
+    }
+
+    card.appendChild(cardLeft);
+    card.appendChild(gradeChip);
+
+    card.onclick = () => {
       haptic.impact("light");
-      openEditGradeModal(gr);
+      openGradeBottomSheet(st, gradeObj);
     };
 
-    const btnDel = document.createElement("button");
-    btnDel.className = "btn btn-danger btn-sm";
-    btnDel.textContent = "O'chirish";
-    btnDel.onclick = () => {
-      deleteGrade(gr.id, gr.student_name || "O'quvchi");
-    };
-
-    actions.appendChild(btnEdit);
-    actions.appendChild(btnDel);
-
-    card.appendChild(pill);
-    card.appendChild(info);
-    card.appendChild(actions);
     gradesListEl.appendChild(card);
   });
 }
 
-const modalGrade = document.getElementById("modalGrade");
-const formGrade = document.getElementById("formGrade");
-const gradeStudentSelect = document.getElementById("gradeStudentSelect");
-const gradeButtons = document.querySelectorAll(".btn-grade");
+function openGradeBottomSheet(student, gradeObj) {
+  selectedStudentForGrade = student;
+  selectedGradeRecord = gradeObj || null;
 
-gradeButtons.forEach((btn) => {
-  btn.onclick = () => {
-    haptic.selection();
-    gradeButtons.forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("gradeValue").value = btn.getAttribute("data-val");
-  };
-});
+  const titleEl = document.getElementById("sheetGradeStudentName");
+  if (titleEl) {
+    titleEl.textContent = `${student.first_name} ${student.last_name}`;
+  }
 
-document.getElementById("btnOpenAddGrade").onclick = async () => {
-  haptic.impact("light");
-  document.getElementById("modalGradeTitle").textContent = "Baho qo'yish";
-  document.getElementById("gradeId").value = "";
-  document.getElementById("gradeStudentSelectGroup")?.classList.remove("hidden");
-
-  // O'quvchilar ro'yxatini select ga yuklash
-  try {
-    const students = await apiRequest("/api/students");
-    gradeStudentSelect.replaceChildren();
-
-    if (!students || students.length === 0) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "O'quvchilar topilmadi";
-      gradeStudentSelect.appendChild(opt);
+  // 1-5 tugmalarni yangilash
+  const currentVal = gradeObj ? gradeObj.value : null;
+  document.querySelectorAll(".btn-grade-round").forEach((btn) => {
+    const val = parseInt(btn.getAttribute("data-val"), 10);
+    if (val === currentVal) {
+      btn.classList.add("active");
     } else {
-      students.forEach((st) => {
-        const opt = document.createElement("option");
-        opt.value = st.id;
-        opt.textContent = `${st.first_name} ${st.last_name} (${st.grade})`;
-        gradeStudentSelect.appendChild(opt);
-      });
-    }
-
-    modalGrade.classList.remove("hidden");
-    updateBackButton();
-  } catch (err) {}
-};
-
-document.getElementById("btnCloseGradeModal").onclick = () => {
-  haptic.impact("light");
-  modalGrade.classList.add("hidden");
-  updateBackButton();
-};
-
-function openEditGradeModal(gr) {
-  document.getElementById("modalGradeTitle").textContent = "Bahoni tahrirlash";
-  document.getElementById("gradeId").value = gr.id;
-  document.getElementById("gradeStudentSelectGroup")?.classList.add("hidden");
-
-  gradeButtons.forEach((b) => {
-    if (b.getAttribute("data-val") === String(gr.value)) {
-      b.classList.add("active");
-    } else {
-      b.classList.remove("active");
+      btn.classList.remove("active");
     }
   });
-  document.getElementById("gradeValue").value = gr.value;
 
-  modalGrade.classList.remove("hidden");
+  // O'chirish tugmasi ko'rinishi
+  if (wrapGradeDeleteBtn) {
+    if (gradeObj) {
+      wrapGradeDeleteBtn.classList.remove("hidden");
+    } else {
+      wrapGradeDeleteBtn.classList.add("hidden");
+    }
+  }
+
+  sheetGradeSelector?.classList.remove("hidden");
   updateBackButton();
 }
 
-formGrade.onsubmit = async (e) => {
-  e.preventDefault();
-  haptic.impact("medium");
+// Baho tugmalarini bosish
+document.querySelectorAll(".btn-grade-round").forEach((btn) => {
+  btn.onclick = async () => {
+    const val = parseInt(btn.getAttribute("data-val"), 10);
+    haptic.impact("medium");
 
-  const saveBtn = document.getElementById("btnSaveGrade");
-  const origText = saveBtn.textContent;
-  saveBtn.disabled = true;
-  saveBtn.textContent = "Saqlanmoqda...";
-
-  const id = document.getElementById("gradeId").value;
-  const val = parseInt(document.getElementById("gradeValue").value, 10);
-  const dt = gradeDateInput.value || getTodayString();
-
-  try {
-    if (id) {
-      await apiRequest(`/api/grades/${id}`, { method: "PUT", body: JSON.stringify({ value: val }) });
-      showToast("Baho yangilandi", "success");
-    } else {
-      const studentId = parseInt(gradeStudentSelect.value, 10);
-      if (!studentId) {
-        showToast("Iltimos, o'quvchini tanlang", "warning");
-        return;
-      }
-      await apiRequest("/api/grades", {
-        method: "POST",
-        body: JSON.stringify({ student_id: studentId, date: dt, value: val })
-      });
-      showToast("Baho qo'yildi", "success");
-    }
-
-    haptic.notification("success");
-    modalGrade.classList.add("hidden");
+    sheetGradeSelector?.classList.add("hidden");
     updateBackButton();
-    loadGrades();
-  } catch (err) {
-  } finally {
-    saveBtn.disabled = false;
-    saveBtn.textContent = origText;
-  }
-};
 
-async function deleteGrade(id, studentName) {
+    if (!selectedStudentForGrade) return;
+
+    try {
+      if (selectedGradeRecord) {
+        // Yangilash
+        await apiRequest(`/api/grades/${selectedGradeRecord.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ value: val })
+        });
+      } else {
+        // Yangi qo'yish
+        await apiRequest("/api/grades", {
+          method: "POST",
+          body: JSON.stringify({
+            student_id: selectedStudentForGrade.id,
+            date: currentGradeDate,
+            value: val
+          })
+        });
+      }
+      haptic.notification("success");
+      loadGrades();
+    } catch (err) {}
+  };
+});
+
+// Bahoni o'chirish
+document.getElementById("btnGradeDelete")?.addEventListener("click", async () => {
+  haptic.impact("medium");
+  sheetGradeSelector?.classList.add("hidden");
+  updateBackButton();
+
+  if (!selectedGradeRecord) return;
   const confirmed = await confirmAction(
-    `"${studentName}" uchun bahoni o'chirishni tasdiqlaysizmi?`,
-    "Bahoni o'chirish"
+    "Ushbu bahoni o'chirishni tasdiqlaysizmi?",
+    "O'chirish"
   );
 
   if (confirmed) {
     try {
-      await apiRequest(`/api/grades/${id}`, { method: "DELETE" });
+      await apiRequest(`/api/grades/${selectedGradeRecord.id}`, { method: "DELETE" });
       haptic.notification("success");
       showToast("Baho o'chirildi", "success");
       loadGrades();
     } catch (err) {}
   }
-}
+});
 
 // ----------------------------------------------------
 // 4. MANBALAR BO'LIMI
 // ----------------------------------------------------
+let allSources = [];
+let selectedSourceForAction = null;
 const sourcesListEl = document.getElementById("sourcesList");
 const sourcesLoaderEl = document.getElementById("sourcesLoader");
-let allSources = [];
+const sheetSourceActions = document.getElementById("sheetSourceActions");
+const modalSource = document.getElementById("modalSource");
+const formSource = document.getElementById("formSource");
 
 async function loadSources() {
   sourcesLoaderEl?.classList.remove("hidden");
@@ -875,10 +1077,15 @@ function renderSources() {
     const emptyCard = document.createElement("div");
     emptyCard.className = "empty-card";
 
+    const emptyIcon = document.createElement("div");
+    emptyIcon.className = "empty-icon-wrap";
+    emptyIcon.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>`;
+
     const emptyTitle = document.createElement("div");
     emptyTitle.className = "empty-title";
     emptyTitle.textContent = "Manbalar mavjud emas";
 
+    emptyCard.appendChild(emptyIcon);
     emptyCard.appendChild(emptyTitle);
     sourcesListEl.appendChild(emptyCard);
     return;
@@ -888,109 +1095,156 @@ function renderSources() {
     const card = document.createElement("div");
     card.className = "card";
 
+    const cardLeft = document.createElement("div");
+    cardLeft.className = "card-left";
+
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "source-icon-wrap";
+    iconWrap.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>`;
+
     const info = document.createElement("div");
     info.className = "card-info";
 
-    const titleRow = document.createElement("div");
-    titleRow.className = "card-title-row";
-
     const title = document.createElement("div");
     title.className = "card-title";
-    title.textContent = src.title_uz || src.title_en || src.title_ru || "Manba";
-
-    const badge = document.createElement("span");
-    badge.className = "card-badge";
-    badge.textContent = "UZ/EN/RU";
-
-    titleRow.appendChild(title);
-    titleRow.appendChild(badge);
+    title.textContent = src.title_uz;
 
     const subtitle = document.createElement("div");
     subtitle.className = "card-subtitle";
-    const previewText = src.text_uz || src.text_en || src.text_ru || "";
-    subtitle.textContent = previewText.length > 60 ? previewText.substring(0, 60) + "..." : previewText;
+    subtitle.textContent = src.text_uz;
 
-    info.appendChild(titleRow);
+    info.appendChild(title);
     info.appendChild(subtitle);
 
-    const actions = document.createElement("div");
-    actions.className = "card-actions";
+    cardLeft.appendChild(iconWrap);
+    cardLeft.appendChild(info);
 
-    const btnEdit = document.createElement("button");
-    btnEdit.className = "btn btn-secondary btn-sm";
-    btnEdit.textContent = "Tahrirlash";
-    btnEdit.onclick = () => {
+    const chevron = document.createElement("div");
+    chevron.className = "card-chevron";
+    chevron.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+
+    card.appendChild(cardLeft);
+    card.appendChild(chevron);
+
+    card.onclick = () => {
       haptic.impact("light");
-      openEditSourceModal(src);
+      openSourceActionSheet(src);
     };
 
-    const btnDel = document.createElement("button");
-    btnDel.className = "btn btn-danger btn-sm";
-    btnDel.textContent = "O'chirish";
-    btnDel.onclick = () => {
-      deleteSource(src.id, src.title_uz || "Manba");
-    };
-
-    actions.appendChild(btnEdit);
-    actions.appendChild(btnDel);
-
-    card.appendChild(info);
-    card.appendChild(actions);
     sourcesListEl.appendChild(card);
   });
 }
 
-const modalSource = document.getElementById("modalSource");
-const formSource = document.getElementById("formSource");
+function openSourceActionSheet(src) {
+  selectedSourceForAction = src;
+  const titleEl = document.getElementById("sheetSourceTitle");
+  if (titleEl) titleEl.textContent = src.title_uz;
 
-document.getElementById("btnOpenAddSource").onclick = () => {
+  sheetSourceActions?.classList.remove("hidden");
+  updateBackButton();
+}
+
+document.getElementById("btnSheetEditSource")?.addEventListener("click", () => {
   haptic.impact("light");
+  sheetSourceActions?.classList.add("hidden");
+  if (selectedSourceForAction) {
+    openEditSourceModal(selectedSourceForAction);
+  }
+});
+
+document.getElementById("btnSheetDeleteSource")?.addEventListener("click", async () => {
+  haptic.impact("medium");
+  sheetSourceActions?.classList.add("hidden");
+  updateBackButton();
+
+  if (!selectedSourceForAction) return;
+  const confirmed = await confirmAction(
+    `"${selectedSourceForAction.title_uz}" manbasini o'chirishni tasdiqlaysizmi?`,
+    "O'chirish"
+  );
+
+  if (confirmed) {
+    try {
+      await apiRequest(`/api/sources/${selectedSourceForAction.id}`, { method: "DELETE" });
+      haptic.notification("success");
+      showToast("Manba o'chirildi", "success");
+      loadSources();
+    } catch (err) {}
+  }
+});
+
+function openAddSourceModal() {
   document.getElementById("modalSourceTitle").textContent = "Manba qo'shish";
   document.getElementById("sourceId").value = "";
-  document.getElementById("sourceAddFields")?.classList.remove("hidden");
-  document.getElementById("sourceEditFields")?.classList.add("hidden");
+  document.getElementById("sourceAddFields").classList.remove("hidden");
+  document.getElementById("sourceEditFields").classList.add("hidden");
   document.getElementById("sourceTitle").value = "";
   document.getElementById("sourceText").value = "";
-  document.getElementById("btnSaveSource").textContent = "Saqlash";
-  modalSource.classList.remove("hidden");
+  modalSource?.classList.remove("hidden");
   updateBackButton();
-};
-
-document.getElementById("btnCloseSourceModal").onclick = () => {
-  haptic.impact("light");
-  modalSource.classList.add("hidden");
-  updateBackButton();
-};
+}
 
 function openEditSourceModal(src) {
   document.getElementById("modalSourceTitle").textContent = "Manbani tahrirlash";
   document.getElementById("sourceId").value = src.id;
-  document.getElementById("sourceAddFields")?.classList.add("hidden");
-  document.getElementById("sourceEditFields")?.classList.remove("hidden");
+  document.getElementById("sourceAddFields").classList.add("hidden");
+  document.getElementById("sourceEditFields").classList.remove("hidden");
 
-  document.getElementById("sourceTitleUz").value = src.title_uz || "";
-  document.getElementById("sourceTextUz").value = src.text_uz || "";
-  document.getElementById("sourceTitleEn").value = src.title_en || "";
-  document.getElementById("sourceTextEn").value = src.text_en || "";
-  document.getElementById("sourceTitleRu").value = src.title_ru || "";
-  document.getElementById("sourceTextRu").value = src.text_ru || "";
-  document.getElementById("btnSaveSource").textContent = "Saqlash";
+  document.getElementById("sourceTitleUz").value = src.title_uz;
+  document.getElementById("sourceTextUz").value = src.text_uz;
+  document.getElementById("sourceTitleEn").value = src.title_en;
+  document.getElementById("sourceTextEn").value = src.text_en;
+  document.getElementById("sourceTitleRu").value = src.title_ru;
+  document.getElementById("sourceTextRu").value = src.text_ru;
 
-  modalSource.classList.remove("hidden");
+  switchLangPane("uz");
+  modalSource?.classList.remove("hidden");
   updateBackButton();
 }
 
-formSource.onsubmit = async (e) => {
+document.getElementById("btnCloseSourceModal")?.addEventListener("click", () => {
+  haptic.impact("light");
+  modalSource?.classList.add("hidden");
+  updateBackButton();
+});
+
+// Tahrirlashdagi UZ | EN | RU tablari
+document.querySelectorAll(".lang-tab-item").forEach((btn) => {
+  btn.onclick = () => {
+    haptic.selection();
+    const lang = btn.getAttribute("data-lang");
+    switchLangPane(lang);
+  };
+});
+
+function switchLangPane(lang) {
+  document.querySelectorAll(".lang-tab-item").forEach((b) => {
+    if (b.getAttribute("data-lang") === lang) {
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
+    }
+  });
+
+  document.querySelectorAll(".lang-pane").forEach((pane) => {
+    pane.classList.remove("active");
+  });
+
+  const activePane = document.getElementById(`pane${lang.charAt(0).toUpperCase() + lang.slice(1)}`);
+  activePane?.classList.add("active");
+}
+
+formSource?.addEventListener("submit", async (e) => {
   e.preventDefault();
   haptic.impact("medium");
 
+  const saveBtn = document.getElementById("btnSaveSource");
+  const origText = saveBtn.textContent;
   const id = document.getElementById("sourceId").value;
-  const btnSave = document.getElementById("btnSaveSource");
-  const origText = btnSave.textContent;
 
   if (id) {
-    btnSave.textContent = "Saqlanmoqda...";
-    btnSave.disabled = true;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saqlanmoqda...";
 
     const payload = {
       title_uz: document.getElementById("sourceTitleUz").value.trim(),
@@ -1006,53 +1260,39 @@ formSource.onsubmit = async (e) => {
       await apiRequest(`/api/sources/${id}`, { method: "PUT", body: JSON.stringify(payload) });
       haptic.notification("success");
       showToast("Manba yangilandi", "success");
-      modalSource.classList.add("hidden");
+      modalSource?.classList.add("hidden");
       updateBackButton();
       loadSources();
     } catch (err) {
     } finally {
-      btnSave.textContent = origText;
-      btnSave.disabled = false;
+      saveBtn.disabled = false;
+      saveBtn.textContent = origText;
     }
   } else {
-    btnSave.textContent = "Tarjima qilinmoqda...";
-    btnSave.disabled = true;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Tarjima qilinmoqda...";
+
+    const payload = {
+      title: document.getElementById("sourceTitle").value.trim(),
+      text: document.getElementById("sourceText").value.trim(),
+      source_lang: document.getElementById("sourceLang").value
+    };
 
     try {
-      const payload = {
-        title: document.getElementById("sourceTitle").value.trim(),
-        text: document.getElementById("sourceText").value.trim(),
-        source_lang: document.getElementById("sourceLang").value
-      };
       await apiRequest("/api/sources", { method: "POST", body: JSON.stringify(payload) });
       haptic.notification("success");
-      showToast("Manba qo'shildi va avtomatik tarjima qilindi", "success");
-      modalSource.classList.add("hidden");
+      showToast("Yangi manba qo'shildi", "success");
+      modalSource?.classList.add("hidden");
       updateBackButton();
       loadSources();
     } catch (err) {
     } finally {
-      btnSave.textContent = origText;
-      btnSave.disabled = false;
+      saveBtn.disabled = false;
+      saveBtn.textContent = origText;
     }
   }
-};
-
-async function deleteSource(id, title) {
-  const confirmed = await confirmAction(
-    `"${title}" manbasini o'chirishni tasdiqlaysizmi?`,
-    "Manbani o'chirish"
-  );
-
-  if (confirmed) {
-    try {
-      await apiRequest(`/api/sources/${id}`, { method: "DELETE" });
-      haptic.notification("success");
-      showToast("Manba o'chirildi", "success");
-      loadSources();
-    } catch (err) {}
-  }
-}
+});
 
 // Dastlabki yuklanish
+updateFabVisibility();
 loadStudents();
