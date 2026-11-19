@@ -50,42 +50,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    networks:
-      - bot_network
-
-  # 1-variant: O'z domeniga ega bo'lganlar uchun (Caddy - avtomatik HTTPS)
-  proxy:
-    image: caddy:2-alpine
-    container_name: course_bot_caddy
-    restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
+      - "8008:8000"
     networks:
       - bot_network
-
-  # 2-variant: Domen bo'lmagan holatda Cloudflare Tunnel (kerak bo'lsa yoqiladi)
-  # tunnel:
-  #   image: cloudflare/cloudflared:latest
-  #   container_name: course_bot_cloudflared
-  #   restart: unless-stopped
-  #   command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-  #   depends_on:
-  #     - app
-  #   networks:
-  #     - bot_network
 
 volumes:
   postgres_data:
   redis_data:
-  caddy_data:
-  caddy_config:
 
 networks:
   bot_network:

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -37,24 +38,37 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await redis.ping()
     logger.info("Redis ulanishi muvaffaqiyatli.")
 
-    # 3. Webhook sozlash
-    webhook_url = f"{settings.WEBAPP_URL}/webhook/{settings.SECRET_PATH}"
-    await bot.set_webhook(
-        url=webhook_url,
-        secret_token=settings.SECRET_TOKEN,
-        drop_pending_updates=True,
-        allowed_updates=dp.resolve_used_update_types()
-    )
-    logger.info(f"Telegram webhook ornatildi: {webhook_url}")
+    # 3. Botni ishga tushirish (Polling yoki Webhook)
+    polling_task = None
+    if getattr(settings, "BOT_MODE", "polling") == "polling":
+        await bot.delete_webhook(drop_pending_updates=True)
+        polling_task = asyncio.create_task(dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types()))
+        logger.info("Telegram bot Long Polling rejimida muvaffaqiyatli ishga tushdi.")
+    else:
+        webhook_url = f"{settings.WEBAPP_URL}/webhook/{settings.SECRET_PATH}"
+        await bot.set_webhook(
+            url=webhook_url,
+            secret_token=settings.SECRET_TOKEN,
+            drop_pending_updates=True,
+            allowed_updates=dp.resolve_used_update_types()
+        )
+        logger.info(f"Telegram webhook ornatildi: {webhook_url}")
 
     yield
 
     # Shutdown
     logger.info("Ilova toxtatilmoqda...")
-    try:
-        await bot.delete_webhook(drop_pending_updates=True)
-    except Exception as e:
-        logger.error(f"Webhook ochirishda xatolik: {e}")
+    if polling_task:
+        polling_task.cancel()
+        try:
+            await polling_task
+        except (asyncio.CancelledError, Exception):
+            pass
+    else:
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+        except Exception as e:
+            logger.error(f"Webhook ochirishda xatolik: {e}")
 
     await bot.session.close()
     await close_redis()
