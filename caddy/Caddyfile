@@ -1,0 +1,18 @@
+{$DOMAIN:your-domain.uz} {
+    encode gzip zstd
+
+    # Statik fayllar uchun kesh
+    @static path /app/*
+    header @static Cache-Control "public, max-age=3600, must-revalidate"
+
+    # API va Webhook uchun keshlanmaslik
+    @dynamic path /api/* /webhook/*
+    header @dynamic Cache-Control "no-store, no-cache, must-revalidate"
+
+    reverse_proxy app:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

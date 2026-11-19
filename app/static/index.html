@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Admin Mini App</title>
+  <link rel="stylesheet" href="/app/style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+  <!-- Yuqori qism: X tugmasi va sarlavha -->
+  <header class="app-header">
+    <div class="header-title" id="headerTitle">Admin Paneli</div>
+    <button class="close-btn" id="btnClose" aria-label="Yopish">X</button>
+  </header>
+
+  <!-- 401: Ruxsat yo'q ekrani -->
+  <div id="unauthorizedView" class="view hidden">
+    <div class="unauthorized-box">
+      <div class="unauthorized-title">Ruxsat berilmagan</div>
+      <div class="unauthorized-desc">Admin sessiyasi topilmadi yoki muddati tugagan. Iltimos, bot orqali /admin buyrug'ini yuboring va kodni kiriting.</div>
+      <button class="btn btn-primary" id="btnUnauthorizedClose">Yopish</button>
+    </div>
+  </div>
+
+  <!-- Asosiy ilova qismi -->
+  <main id="mainApp" class="main-container">
+
+    <!-- 1. O'quvchilar bo'limi -->
+    <section id="tabStudents" class="tab-content active">
+      <div class="section-actions">
+        <input type="text" id="studentSearchInput" class="input-field" placeholder="Qidiruv (ism, familiya, sinf)...">
+        <button class="btn btn-primary" id="btnOpenAddStudent">Qo'shish</button>
+      </div>
+      <div id="studentsList" class="items-list"></div>
+    </section>
+
+    <!-- 2. Davomat bo'limi -->
+    <section id="tabAttendance" class="tab-content">
+      <div class="section-actions">
+        <label for="attendanceDate" class="label-date">Sana:</label>
+        <input type="date" id="attendanceDate" class="input-field date-input">
+      </div>
+      <div id="attendanceList" class="items-list"></div>
+    </section>
+
+    <!-- 3. Baholash bo'limi -->
+    <section id="tabGrades" class="tab-content">
+      <div class="section-actions">
+        <label for="gradeDate" class="label-date">Sana:</label>
+        <input type="date" id="gradeDate" class="input-field date-input">
+        <button class="btn btn-primary" id="btnOpenAddGrade">Baho qo'yish</button>
+      </div>
+      <div id="gradesList" class="items-list"></div>
+    </section>
+
+    <!-- 4. Manbalar bo'limi -->
+    <section id="tabSources" class="tab-content">
+      <div class="section-actions">
+        <div class="section-info">Manbalar ro'yxati</div>
+        <button class="btn btn-primary" id="btnOpenAddSource">Qo'shish</button>
+      </div>
+      <div id="sourcesList" class="items-list"></div>
+    </section>
+
+  </main>
+
+  <!-- Pastki menyu (Tablar) -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-item active" data-tab="tabStudents">O'quvchilar</button>
+    <button class="nav-item" data-tab="tabAttendance">Davomat</button>
+    <button class="nav-item" data-tab="tabGrades">Baholash</button>
+    <button class="nav-item" data-tab="tabSources">Manbalar</button>
+  </nav>
+
+  <!-- Modal: O'quvchi qo'shish / tahrirlash -->
+  <div id="modalStudent" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="modalStudentTitle">O'quvchi qo'shish</span>
+        <button class="modal-close" id="btnCloseStudentModal">X</button>
+      </div>
+      <form id="formStudent">
+        <input type="hidden" id="studentId">
+        <div class="form-group">
+          <label>Ism</label>
+          <input type="text" id="studentFirstName" class="input-field" required maxlength="100">
+        </div>
+        <div class="form-group">
+          <label>Familiya</label>
+          <input type="text" id="studentLastName" class="input-field" required maxlength="100">
+        </div>
+        <div class="form-group">
+          <label>Sinf</label>
+          <input type="text" id="studentGrade" class="input-field" required maxlength="50">
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="btnSaveStudent">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Baho qo'yish / tahrirlash -->
+  <div id="modalGrade" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="modalGradeTitle">Baho qo'yish</span>
+        <button class="modal-close" id="btnCloseGradeModal">X</button>
+      </div>
+      <form id="formGrade">
+        <input type="hidden" id="gradeId">
+        <div class="form-group" id="gradeStudentSelectGroup">
+          <label>O'quvchi</label>
+          <select id="gradeStudentSelect" class="input-field" required></select>
+        </div>
+        <div class="form-group">
+          <label>Baho (1 dan 5 gacha)</label>
+          <div class="grade-buttons" id="gradeButtons">
+            <button type="button" class="btn-grade" data-val="1">1</button>
+            <button type="button" class="btn-grade" data-val="2">2</button>
+            <button type="button" class="btn-grade" data-val="3">3</button>
+            <button type="button" class="btn-grade" data-val="4">4</button>
+            <button type="button" class="btn-grade active" data-val="5">5</button>
+          </div>
+          <input type="hidden" id="gradeValue" value="5">
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Manba qo'shish / tahrirlash -->
+  <div id="modalSource" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="modalSourceTitle">Manba qo'shish</span>
+        <button class="modal-close" id="btnCloseSourceModal">X</button>
+      </div>
+      <form id="formSource">
+        <input type="hidden" id="sourceId">
+        <div id="sourceAddFields">
+          <div class="form-group">
+            <label>Kiritish tili</label>
+            <select id="sourceLang" class="input-field">
+              <option value="uz">O'zbekcha</option>
+              <option value="en">English</option>
+              <option value="ru">Русский</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Sarlavha</label>
+            <input type="text" id="sourceTitle" class="input-field" maxlength="255">
+          </div>
+          <div class="form-group">
+            <label>Matn</label>
+            <textarea id="sourceText" class="input-field textarea" rows="4"></textarea>
+          </div>
+        </div>
+        <div id="sourceEditFields" class="hidden">
+          <div class="form-group">
+            <label>Sarlavha (UZ)</label>
+            <input type="text" id="sourceTitleUz" class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Matn (UZ)</label>
+            <textarea id="sourceTextUz" class="input-field textarea" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Sarlavha (EN)</label>
+            <input type="text" id="sourceTitleEn" class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Matn (EN)</label>
+            <textarea id="sourceTextEn" class="input-field textarea" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Sarlavha (RU)</label>
+            <input type="text" id="sourceTitleRu" class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Matn (RU)</label>
+            <textarea id="sourceTextRu" class="input-field textarea" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="btnSaveSource">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/app/app.js"></script>
+</body>
+</html>
