@@ -9,7 +9,8 @@ from app.database import async_session_maker
 from app.redis import redis_client
 from app.models.bot_user import BotUser
 from app.models.student import Student
-from app.models.attendance import Absence
+from app.models.attendance import AttendanceMark, AttendanceSession, Absence
+from app.models.lesson import Lesson
 from app.models.source import Source
 from app.i18n.texts import get_text
 from app.services.time_service import get_tashkent_now, is_weekend
@@ -161,18 +162,64 @@ async def show_students(message: Message, lang: Optional[str] = None):
     await render_students_page(message, user_lang, page=1)
 
 
+def format_bot_late_display(minutes: Optional[int], lang: str = "uz") -> str:
+    if not minutes:
+        minutes = 0
+    if minutes < 60:
+        if lang == "en":
+            return f"+{minutes} min late"
+        elif lang == "ru":
+            return f"+{minutes} мин опоздал(а)"
+        return f"+{minutes} daqiqa kech qoldi"
+    hours = minutes // 60
+    rem = minutes % 60
+    if rem == 0:
+        if lang == "en":
+            return f"+{hours} h late"
+        elif lang == "ru":
+            return f"+{hours} ч опоздал(а)"
+        return f"+{hours} soat kech qoldi"
+    if lang == "en":
+        return f"+{hours} h {rem} min late"
+    elif lang == "ru":
+        return f"+{hours} ч {rem} мин опоздал(а)"
+    return f"+{hours} soat {rem} daqiqa kech qoldi"
+
+
 async def fetch_students_with_absences() -> List[Dict[str, Any]]:
     async with async_session_maker() as session:
+        # Absences subquery
+        abs_sub = (
+            select(
+                AttendanceMark.student_id,
+                func.count(AttendanceMark.id).label("absences_count")
+            )
+            .where(AttendanceMark.status == "absent")
+            .group_by(AttendanceMark.student_id)
+            .subquery()
+        )
+        # Lates subquery
+        late_sub = (
+            select(
+                AttendanceMark.student_id,
+                func.count(AttendanceMark.id).label("lates_count")
+            )
+            .where(AttendanceMark.status == "late")
+            .group_by(AttendanceMark.student_id)
+            .subquery()
+        )
+
         stmt = (
             select(
                 Student.id,
                 Student.first_name,
                 Student.last_name,
                 Student.grade,
-                func.count(Absence.id).label("absences_count")
+                func.coalesce(abs_sub.c.absences_count, 0).label("absences_count"),
+                func.coalesce(late_sub.c.lates_count, 0).label("lates_count")
             )
-            .outerjoin(Absence, Student.id == Absence.student_id)
-            .group_by(Student.id, Student.first_name, Student.last_name, Student.grade)
+            .outerjoin(abs_sub, Student.id == abs_sub.c.student_id)
+            .outerjoin(late_sub, Student.id == late_sub.c.student_id)
             .order_by(Student.last_name.asc(), Student.first_name.asc(), Student.id.asc())
         )
         result = await session.execute(stmt)
@@ -183,7 +230,8 @@ async def fetch_students_with_absences() -> List[Dict[str, Any]]:
                 "first_name": r.first_name,
                 "last_name": r.last_name,
                 "grade": r.grade,
-                "absences_count": int(r.absences_count)
+                "absences_count": int(r.absences_count),
+                "lates_count": int(r.lates_count)
             }
             for r in rows
         ]
@@ -213,9 +261,14 @@ async def render_students_page(target: Message, lang: str, page: int = 1, is_edi
     for i, s in enumerate(page_students):
         idx = start_idx + i + 1
         name = f"{s['first_name']} {s['last_name'] or ''}".strip()
-        lines.append(
-            get_text("student_absence_item", lang, idx=idx, name=name, absences=s["absences_count"])
-        )
+        if "lates_count" in s:
+            lines.append(
+                get_text("student_with_lates_item", lang, idx=idx, name=name, absences=s["absences_count"], lates=s["lates_count"])
+            )
+        else:
+            lines.append(
+                get_text("student_absence_item", lang, idx=idx, name=name, absences=s["absences_count"])
+            )
 
     text = "\n".join(lines)
     keyboard = get_students_pagination_keyboard(page, total_pages)
@@ -253,27 +306,30 @@ async def show_attendance(message: Message, lang: Optional[str] = None):
     today_str = today.strftime("%Y-%m-%d")
 
     async with async_session_maker() as session:
+        # Check started lessons
+        lessons_stmt = select(Lesson).where(Lesson.date == today)
+        lessons_res = await session.execute(lessons_stmt)
+        lessons_map = {l.lesson_no: l for l in lessons_res.scalars().all()}
+
+        # Check recorded attendance sessions
+        sessions_stmt = select(AttendanceSession).where(AttendanceSession.date == today)
+        sessions_res = await session.execute(sessions_stmt)
+        sessions_set = {s.lesson_no for s in sessions_res.scalars().all()}
+
         stmt = (
             select(
-                Absence.lesson,
+                AttendanceMark.lesson_no,
+                AttendanceMark.status,
+                AttendanceMark.late_minutes,
                 Student.first_name,
                 Student.last_name
             )
-            .join(Student, Absence.student_id == Student.id)
-            .where(Absence.date == today)
-            .order_by(Absence.lesson.asc(), Student.last_name.asc(), Student.first_name.asc())
+            .join(Student, AttendanceMark.student_id == Student.id)
+            .where(AttendanceMark.date == today)
+            .order_by(AttendanceMark.lesson_no.asc(), Student.last_name.asc(), Student.first_name.asc())
         )
         result = await session.execute(stmt)
-        absences = result.all()
-
-    lesson1_absentees = [
-        f"- {r.first_name} {r.last_name or ''}".strip()
-        for r in absences if r.lesson == 1
-    ]
-    lesson2_absentees = [
-        f"- {r.first_name} {r.last_name or ''}".strip()
-        for r in absences if r.lesson == 2
-    ]
+        marks = result.all()
 
     title = get_text("attendance_title", user_lang, date=today_str)
     lines = [title]
@@ -284,25 +340,44 @@ async def show_attendance(message: Message, lang: Optional[str] = None):
     else:
         lines.append("")
 
-    # 1-dars (07:00)
-    lines.append(get_text("attendance_lesson1_title", user_lang))
-    if lesson1_absentees:
-        lines.append(get_text("attendance_absentees_header", user_lang))
-        lines.extend(lesson1_absentees)
-    else:
-        lines.append(get_text("attendance_no_absentees", user_lang))
+    for lesson_no in (1, 2):
+        lesson_title_key = f"attendance_lesson{lesson_no}_title"
+        lines.append(get_text(lesson_title_key, user_lang))
 
-    lines.append("")
+        lesson_marks = [
+            m for m in marks
+            if getattr(m, "lesson_no", getattr(m, "lesson", None)) == lesson_no
+        ]
+        absentees = [
+            f"- {r.first_name} {r.last_name or ''}".strip()
+            for r in lesson_marks if getattr(r, "status", "absent") == "absent"
+        ]
+        lates = [
+            f"- {r.first_name} {r.last_name or ''} {format_bot_late_display(getattr(r, 'late_minutes', 0), user_lang)}".strip()
+            for r in lesson_marks if getattr(r, "status", None) == "late"
+        ]
 
-    # 2-dars (15:45)
-    lines.append(get_text("attendance_lesson2_title", user_lang))
-    if lesson2_absentees:
-        lines.append(get_text("attendance_absentees_header", user_lang))
-        lines.extend(lesson2_absentees)
-    else:
-        lines.append(get_text("attendance_no_absentees", user_lang))
+        has_marks = len(lesson_marks) > 0
+        is_started = (lesson_no in lessons_map) or has_marks
+        is_taken = (lesson_no in sessions_set) or has_marks
 
-    await message.answer("\n".join(lines))
+        if not is_started and not is_weekend(today):
+            lines.append(get_text("attendance_not_started", user_lang))
+        elif not is_taken and not is_weekend(today):
+            lines.append(get_text("attendance_not_taken", user_lang))
+        elif not absentees and not lates:
+            lines.append(get_text("attendance_no_absentees", user_lang))
+        else:
+            if absentees:
+                lines.append(get_text("attendance_absentees_header", user_lang))
+                lines.extend(absentees)
+            if lates:
+                lines.append(get_text("attendance_lates_header", user_lang))
+                lines.extend(lates)
+
+        lines.append("")
+
+    await message.answer("\n".join(lines).strip())
 
 
 @router.message(F.text.in_([

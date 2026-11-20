@@ -96,6 +96,26 @@ TEXTS: Dict[str, Dict[str, str]] = {
         "en": "Absentees list:",
         "ru": "Список отсутствовавших:"
     },
+    "attendance_lates_header": {
+        "uz": "Kech qolganlar ro'yxati:",
+        "en": "Late arrivals list:",
+        "ru": "Список опоздавших:"
+    },
+    "attendance_not_started": {
+        "uz": "Dars boshlanmagan",
+        "en": "Lesson has not started",
+        "ru": "Урок не начат"
+    },
+    "attendance_not_taken": {
+        "uz": "Davomat olinmagan",
+        "en": "Attendance not recorded",
+        "ru": "Посещаемость не отмечена"
+    },
+    "student_with_lates_item": {
+        "uz": "{idx}. {name} - {absences} marta dars qoldirgan, {lates} marta kech qolgan",
+        "en": "{idx}. {name} - {absences} absences, {lates} late",
+        "ru": "{idx}. {name} - пропусков: {absences}, опозданий: {lates}"
+    },
     "teacher_btn": {
         "uz": "O'qituvchi haqida",
         "en": "About teacher",
