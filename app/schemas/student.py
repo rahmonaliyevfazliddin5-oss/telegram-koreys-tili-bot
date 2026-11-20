@@ -31,9 +31,21 @@ class LedgerItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AttendanceHistoryItem(BaseModel):
+    id: int
+    date: str
+    lesson: int
+    status: str
+    status_text: str  # "Kelmadi" yoki "+15 daqiqa kech qoldi"
+    late_minutes: Optional[int] = None
+
+
 class StudentStats(BaseModel):
     total_absences: int = 0
+    total_lates: int = 0
     total_score: int = 0
+    daily_score: int = 0
+    exam_score: int = 0
     total_debt: int = 0
 
 
@@ -43,11 +55,15 @@ class StudentProfileResponse(BaseModel):
     last_name: Optional[str] = ""
     grade: Optional[str] = None
     total_absences: int = 0
+    total_lates: int = 0
     total_score: int = 0
+    daily_score: int = 0
+    exam_score: int = 0
     total_debt: int = 0
     student: Dict[str, Any]
     stats: StudentStats
     history: List[LedgerItem] = Field(default_factory=list)
+    attendance_history: List[AttendanceHistoryItem] = Field(default_factory=list)
 
 
 class FineCreate(BaseModel):

@@ -6,19 +6,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.api.deps import get_current_admin
 from app.models.student import Student
-from app.models.attendance import Absence
+from app.models.attendance import AttendanceMark
 from app.models.grade import Grade
+from app.models.exam import ExamGrade
 from app.models.fine_ledger import FineLedger
 from app.schemas.student import (
     StudentCreate,
     StudentUpdate,
     StudentResponse,
     StudentProfileResponse,
+    StudentStats,
+    AttendanceHistoryItem,
     FineCreate,
     CollectCreate,
     LedgerResponse
 )
-from app.services.cache_service import invalidate_rating_cache
+from app.schemas.attendance import format_late_display
+from app.services.cache_service import invalidate_all_caches
 
 router = APIRouter()
 
@@ -100,10 +104,14 @@ async def get_student_profile(
     admin: dict = Depends(get_current_admin)
 ):
     """
-    O'quvchi profili:
-    - Asosiy ma'lumotlar
-    - Statistika: Jami dars qoldirgan, Jami ball, Jami qarz
-    - Jarima va to'lovlar amallar tarixi
+    O'quvchi profili (6 ta asosiy ko'rsatkich):
+    1. Jami dars qoldirgan
+    2. Jami kech qolgan
+    3. Jami ball (dars baholari + imtihon baholari)
+    4. Dars jarayonida olgan ball (faqat dars baholari)
+    5. Imtihon bali (faqat imtihon baholari)
+    6. Jami qarz
+    Qo'shimcha: amallar tarixi va oxirgi davomat yozuvlari ro'yxati.
     """
     stmt = select(Student).where(Student.id == student_id)
     result = await db.execute(stmt)
@@ -115,18 +123,35 @@ async def get_student_profile(
             detail="O'quvchi topilmadi"
         )
 
-    # 1. Jami dars qoldirishlar soni
-    abs_stmt = select(func.count(Absence.id)).where(Absence.student_id == student_id)
+    # 1. Jami dars qoldirgan
+    abs_stmt = select(func.count(AttendanceMark.id)).where(
+        AttendanceMark.student_id == student_id,
+        AttendanceMark.status == "absent"
+    )
     total_absences = (await db.execute(abs_stmt)).scalar_one() or 0
 
-    # 2. Jami ballar yig'indisi
-    grades_stmt = select(func.coalesce(func.sum(Grade.value), 0)).where(Grade.student_id == student_id)
-    total_score = (await db.execute(grades_stmt)).scalar_one() or 0
+    # 2. Jami kech qolgan
+    late_stmt = select(func.count(AttendanceMark.id)).where(
+        AttendanceMark.student_id == student_id,
+        AttendanceMark.status == "late"
+    )
+    total_lates = (await db.execute(late_stmt)).scalar_one() or 0
 
-    # 3. Jami qarz
+    # 3. Dars jarayonida olgan ball (dars baholari yig'indisi)
+    grades_stmt = select(func.coalesce(func.sum(Grade.value), 0)).where(Grade.student_id == student_id)
+    daily_score = (await db.execute(grades_stmt)).scalar_one() or 0
+
+    # 4. Imtihon bali (imtihon baholari yig'indisi, modifier e'tiborga olinmaydi)
+    exam_grades_stmt = select(func.coalesce(func.sum(ExamGrade.value), 0)).where(ExamGrade.student_id == student_id)
+    exam_score = (await db.execute(exam_grades_stmt)).scalar_one() or 0
+
+    # 5. Jami ball = dars baholari + imtihon baholari
+    total_score = int(daily_score + exam_score)
+
+    # 6. Jami qarz
     total_debt = await get_student_debt(db, student_id)
 
-    # 4. Amallar tarixi
+    # Amallar tarixi (jarima va to'lovlar)
     ledger_stmt = (
         select(FineLedger)
         .where(FineLedger.student_id == student_id)
@@ -134,7 +159,6 @@ async def get_student_profile(
         .limit(50)
     )
     ledger_items = (await db.execute(ledger_stmt)).scalars().all()
-
     history = [
         {
             "id": item.id,
@@ -145,6 +169,26 @@ async def get_student_profile(
         for item in ledger_items
     ]
 
+    # Oxirgi davomat yozuvlari ro'yxati
+    att_stmt = (
+        select(AttendanceMark)
+        .where(AttendanceMark.student_id == student_id)
+        .order_by(AttendanceMark.date.desc(), AttendanceMark.lesson_no.desc())
+        .limit(50)
+    )
+    att_records = (await db.execute(att_stmt)).scalars().all()
+    attendance_history = [
+        AttendanceHistoryItem(
+            id=m.id,
+            date=m.date.isoformat(),
+            lesson=m.lesson_no,
+            status=m.status,
+            status_text="Kelmadi" if m.status == "absent" else (format_late_display(m.late_minutes) or "Kech qoldi"),
+            late_minutes=m.late_minutes
+        )
+        for m in att_records
+    ]
+
     student_dict = {
         "id": student.id,
         "first_name": student.first_name,
@@ -152,11 +196,14 @@ async def get_student_profile(
         "grade": student.grade
     }
 
-    stats = {
-        "total_absences": int(total_absences),
-        "total_score": int(total_score),
-        "total_debt": total_debt
-    }
+    stats = StudentStats(
+        total_absences=int(total_absences),
+        total_lates=int(total_lates),
+        total_score=int(total_score),
+        daily_score=int(daily_score),
+        exam_score=int(exam_score),
+        total_debt=total_debt
+    )
 
     return {
         "id": student.id,
@@ -164,11 +211,15 @@ async def get_student_profile(
         "last_name": student.last_name or "",
         "grade": student.grade,
         "total_absences": int(total_absences),
+        "total_lates": int(total_lates),
         "total_score": int(total_score),
+        "daily_score": int(daily_score),
+        "exam_score": int(exam_score),
         "total_debt": total_debt,
         "student": student_dict,
         "stats": stats,
-        "history": history
+        "history": history,
+        "attendance_history": attendance_history
     }
 
 
@@ -205,6 +256,7 @@ async def add_fine(
     await db.commit()
 
     total_debt = await get_student_debt(db, student_id)
+    await invalidate_all_caches()
 
     return {
         "ok": True,
@@ -262,6 +314,7 @@ async def collect_debt(
     await db.commit()
 
     new_debt = await get_student_debt(db, student_id)
+    await invalidate_all_caches()
 
     return {
         "ok": True,
@@ -288,8 +341,8 @@ async def create_student(
     await db.commit()
     await db.refresh(student)
 
-    # Reyting keshini tozalash
-    await invalidate_rating_cache()
+    # Darhol barcha keshlarni tozalash (o'quvchi darhol ko'rinishi uchun)
+    await invalidate_all_caches()
     return student
 
 
@@ -317,8 +370,7 @@ async def update_student(
     await db.commit()
     await db.refresh(student)
 
-    # Reyting keshini tozalash
-    await invalidate_rating_cache()
+    await invalidate_all_caches()
     return student
 
 
@@ -328,6 +380,12 @@ async def delete_student(
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_current_admin)
 ):
+    """
+    O'quvchini butunlay o'chirish (Hard Delete + Cascade).
+    attendance_marks, grades, exam_grades, fine_ledger avtomatik o'chadi.
+    lessons va exams SAQLANADI.
+    Redis keshlari darhol tozalanadi.
+    """
     stmt = select(Student).where(Student.id == student_id)
     result = await db.execute(stmt)
     student = result.scalar_one_or_none()
@@ -341,6 +399,6 @@ async def delete_student(
     await db.delete(student)
     await db.commit()
 
-    # Reyting keshini tozalash
-    await invalidate_rating_cache()
+    # Darhol keshlarni tozalash (reyting, bot ro'yxati, davomat)
+    await invalidate_all_caches()
     return None
