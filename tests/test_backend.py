@@ -84,7 +84,8 @@ def test_validate_init_data_missing_data():
 async def test_cache_invalidation():
     with patch("app.services.cache_service.redis_client.delete", new_callable=AsyncMock) as mock_del:
         await invalidate_rating_cache()
-        mock_del.assert_called_once_with("rating_cache")
+        assert mock_del.call_count == 1
+        assert "rating_cache" in mock_del.call_args[0]
 
     with patch("app.services.cache_service.redis_client.delete", new_callable=AsyncMock) as mock_del:
         await invalidate_sources_cache()

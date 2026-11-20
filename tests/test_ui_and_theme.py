@@ -104,15 +104,15 @@ def test_home_tab_components():
     assert 'homeSourcesList' in html or 'sources-card' in html
 
 
-def test_five_tabs_structure():
-    """5 ta tab to'liq mavjudligi."""
+def test_four_tabs_structure():
+    """Pastki menyuda aynan 4 ta tab mavjudligi: Davomat olib tashlangan."""
     html_path = os.path.join(STATIC_DIR, "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
         html = f.read()
 
-    # 5 ta tab identifikatorlari (camelCase yoki data-tab)
-    assert 'id="tabHome"' in html or 'data-tab="tabHome"' in html
-    assert 'id="tabStudents"' in html or 'data-tab="tabStudents"' in html
-    assert 'id="tabAttendance"' in html or 'data-tab="tabAttendance"' in html
-    assert 'id="tabGrades"' in html or 'data-tab="tabGrades"' in html
-    assert 'id="tabSettings"' in html or 'data-tab="tabSettings"' in html
+    # 4 ta tab identifikatorlari
+    assert 'data-tab="tabHome"' in html
+    assert 'data-tab="tabStudents"' in html
+    assert 'data-tab="tabGrades"' in html
+    assert 'data-tab="tabSettings"' in html
+    assert 'data-tab="tabAttendance"' not in html

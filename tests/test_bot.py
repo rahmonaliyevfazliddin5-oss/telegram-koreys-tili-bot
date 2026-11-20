@@ -8,6 +8,9 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.i18n.texts import TEXTS, get_text
+from app.models.lesson import Lesson
+from app.models.student import Student
+from app.models.grade import Grade
 from app.bot.keyboards.admin_kb import (
     get_admin_webapp_keyboard,
     get_admin_exit_reply_keyboard
@@ -356,27 +359,48 @@ async def test_user_students_list_and_absences():
 async def test_user_attendance_lessons():
     message = AsyncMock()
 
-    class MockRow:
-        def __init__(self, lesson, first_name, last_name):
-            self.lesson = lesson
-            self.first_name = first_name
-            self.last_name = last_name
-
-    mock_db_res = MagicMock()
-    mock_db_res.all.return_value = [
-        MockRow(1, "Sardor", "Qodirov"),
-        MockRow(2, "Jasur", "Nematov")
+    mock_session = AsyncMock()
+    mock_res_lessons = MagicMock()
+    mock_res_lessons.scalars.return_value.all.return_value = [
+        Lesson(id=1, date=date(2026, 11, 20), lesson_no=1, topic="1-dars", started_at=datetime(2026, 11, 20, 7, 0)),
+        Lesson(id=2, date=date(2026, 11, 20), lesson_no=2, topic="2-dars", started_at=datetime(2026, 11, 20, 15, 45))
     ]
 
-    mock_session = AsyncMock()
-    mock_session.execute.return_value = mock_db_res
+    mock_res_students = MagicMock()
+    mock_res_students.scalars.return_value.all.return_value = [
+        Student(id=1, first_name="Sardor", last_name="Qodirov", created_at=datetime(2026, 11, 20, 6, 0)),
+        Student(id=2, first_name="Jasur", last_name="Nematov", created_at=datetime(2026, 11, 20, 6, 0))
+    ]
+
+    mock_res_grades = MagicMock()
+    mock_res_grades.scalars.return_value.all.return_value = [
+        Grade(student_id=2, date=date(2026, 11, 20), lesson_no=1, value=5),
+        Grade(student_id=1, date=date(2026, 11, 20), lesson_no=2, value=5)
+    ]
+
+    mock_res_empty = MagicMock()
+    mock_res_empty.all.return_value = []
+    mock_res_empty.scalars.return_value.all.return_value = []
+
+    def mock_execute(stmt):
+        stmt_str = str(stmt).lower()
+        if "from lessons" in stmt_str:
+            return mock_res_lessons
+        elif "from students" in stmt_str:
+            return mock_res_students
+        elif "from grades" in stmt_str:
+            return mock_res_grades
+        else:
+            return mock_res_empty
+
+    mock_session.execute.side_effect = mock_execute
     mock_session_maker = MagicMock()
     mock_session_maker.return_value.__aenter__.return_value = mock_session
 
     with patch("app.bot.handlers.user.async_session_maker", mock_session_maker), \
          patch("app.bot.handlers.user.get_tashkent_now") as mock_now, \
          patch("app.bot.handlers.user.is_weekend", return_value=False):
-        mock_now.return_value = datetime(2026, 11, 20, 10, 0, tzinfo=ZoneInfo("Asia/Tashkent"))
+        mock_now.return_value = datetime(2026, 11, 20, 21, 0, tzinfo=ZoneInfo("Asia/Tashkent"))
 
         await show_attendance(message, lang="uz")
 

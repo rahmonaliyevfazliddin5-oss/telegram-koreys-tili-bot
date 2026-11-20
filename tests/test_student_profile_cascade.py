@@ -27,7 +27,7 @@ def mock_admin():
 async def test_student_profile_six_metrics(mock_admin):
     """O'quvchi profili 6 ta asosiy metrika va davomat tarixini to'g'ri qaytarishi."""
     mock_db = AsyncMock()
-    mock_student = Student(id=10, first_name="Ali", last_name="Valiyev", grade="11-B")
+    mock_student = Student(id=10, first_name="Ali", last_name="Valiyev", grade="11-B", created_at=datetime(2026, 1, 1, 0, 0))
 
     # Mocks for student, absences, lates, daily_score, exam_score, fines, payments, ledger, attendance marks
     def mock_execute(stmt):
@@ -37,6 +37,12 @@ async def test_student_profile_six_metrics(mock_admin):
             m_res.scalar_one_or_none.return_value = mock_student
         elif "count(attendance_marks.id)" in stmt_str:
             m_res.scalar_one.return_value = 2
+        elif "count(lessons.id)" in stmt_str:
+            m_res.scalar_one.return_value = 2
+        elif "from lessons" in stmt_str:
+            from app.models.lesson import Lesson
+            m_lesson = Lesson(id=1, date=date(2026, 11, 20), lesson_no=1, started_at=datetime(2026, 11, 20, 7, 0))
+            m_res.scalars.return_value.all.return_value = [m_lesson]
         elif "sum(grades.value)" in stmt_str:
             m_res.scalar_one.return_value = 15
         elif "sum(exam_grades.value)" in stmt_str:

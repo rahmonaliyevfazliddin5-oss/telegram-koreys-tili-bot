@@ -38,44 +38,50 @@ def test_bot_late_display_translations():
 async def test_bot_show_attendance_with_lates_and_absents():
     message = AsyncMock()
 
-    class MockMark:
-        def __init__(self, lesson_no, status, late_minutes, first_name, last_name):
+    class MockLate:
+        def __init__(self, lesson_no, late_minutes, first_name, last_name):
             self.lesson_no = lesson_no
-            self.status = status
             self.late_minutes = late_minutes
             self.first_name = first_name
             self.last_name = last_name
 
-    # Lesson 1: absent student and late student
-    mock_marks = [
-        MockMark(1, "absent", None, "Ali", "Valiyev"),
-        MockMark(1, "late", 15, "Vali", "Aliyev"),
+    mock_late_rows = [
+        MockLate(1, 15, "Vali", "Aliyev")
     ]
 
     mock_session = AsyncMock()
     mock_res_lessons = MagicMock()
-    mock_res_lessons.scalars.return_value.all.return_value = [Lesson(id=1, date=date(2026, 11, 20), lesson_no=1, topic="Kirish")]
+    mock_res_lessons.scalars.return_value.all.return_value = [
+        Lesson(id=1, date=date(2026, 11, 20), lesson_no=1, topic="Kirish", started_at=datetime(2026, 11, 20, 7, 0))
+    ]
 
-    mock_res_sessions = MagicMock()
-    mock_res_sessions.scalars.return_value.all.return_value = [AttendanceSession(date=date(2026, 11, 20), lesson_no=1)]
+    mock_res_students = MagicMock()
+    mock_res_students.scalars.return_value.all.return_value = [
+        Student(id=1, first_name="Ali", last_name="Valiyev", created_at=datetime(2026, 11, 20, 6, 0))
+    ]
 
-    mock_res_marks = MagicMock()
-    mock_res_marks.all.return_value = mock_marks
+    mock_res_lates = MagicMock()
+    mock_res_lates.all.return_value = mock_late_rows
+
+    mock_res_empty = MagicMock()
+    mock_res_empty.scalars.return_value.all.return_value = []
 
     def mock_execute(stmt):
         stmt_str = str(stmt).lower()
         if "from lessons" in stmt_str:
             return mock_res_lessons
-        elif "from attendance_sessions" in stmt_str:
-            return mock_res_sessions
+        elif "from students" in stmt_str:
+            return mock_res_students
+        elif "status = 'late'" in stmt_str or "status = :status_1" in stmt_str:
+            return mock_res_lates
         else:
-            return mock_res_marks
+            return mock_res_empty
 
     mock_session.execute.side_effect = mock_execute
     mock_session_maker = MagicMock()
     mock_session_maker.return_value.__aenter__.return_value = mock_session
 
-    fake_now = datetime(2026, 11, 20, 10, 0, tzinfo=ZoneInfo("Asia/Tashkent"))
+    fake_now = datetime(2026, 11, 20, 13, 0, tzinfo=ZoneInfo("Asia/Tashkent"))
 
     with patch("app.bot.handlers.user.async_session_maker", mock_session_maker), \
          patch("app.bot.handlers.user.get_tashkent_now", return_value=fake_now), \
