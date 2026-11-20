@@ -20,6 +20,15 @@ async def get_current_admin(
             detail="Authorization sarlavhasi talab qilinadi"
         )
 
+    # 0. Global blok tekshiruvi (3 marta xato kiritilganda 30 daqiqa global blok)
+    global_block = await redis.get("admin_block_global")
+    if global_block:
+        ttl = await redis.ttl("admin_block_global")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Tizim global bloklangan. Qolgan vaqt: {ttl} soniya."
+        )
+
     # Mini App yuborgan initData ni ajratib olish
     init_data = auth_header
     if init_data.startswith("tma "):
@@ -31,7 +40,16 @@ async def get_current_admin(
     user_info = validate_init_data(init_data, settings.BOT_TOKEN)
     user_id = user_info["user_id"]
 
-    # 2. Redis'da admin_session:{user_id} borligini tekshirish
+    # 2. Foydalanuvchi bloklanganligini tekshirish
+    user_block = await redis.get(f"admin_block:{user_id}")
+    if user_block:
+        ttl = await redis.ttl(f"admin_block:{user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Admin kirishi bloklangan. Qolgan vaqt: {ttl} soniya."
+        )
+
+    # 3. Redis'da admin_session:{user_id} borligini tekshirish
     session_key = f"admin_session:{user_id}"
     session_exists = await redis.get(session_key)
     if not session_exists:
@@ -40,7 +58,7 @@ async def get_current_admin(
             detail="Admin sessiyasi topilmadi yoki muddati tugagan. Qaytadan /admin orqali kiring."
         )
 
-    # 3. Mini App API so'rovlari uchun Redis asosidagi Rate limit
+    # 4. Mini App API so'rovlari uchun Redis asosidagi Rate limit
     rate_limit_key = f"rate_limit:{user_id}"
     request_count = await redis.incr(rate_limit_key)
     if request_count == 1:

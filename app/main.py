@@ -4,21 +4,23 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from aiogram.types import Update
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "app" / "static"
 
 from app.config import settings
-from app.database import engine
+from app.database import engine, get_db
 from app.redis import get_redis, close_redis
 from app.bot.loader import bot, dp
-from app.api.routers import students, attendance, grades, sources, admin_auth
+from app.api.deps import get_current_admin
+from app.api.routers import students, attendance, grades, sources, admin_auth, status
 
 logging.basicConfig(
     level=logging.INFO,
@@ -143,11 +145,23 @@ async def telegram_webhook(
 
 
 # API routerlarni ulash
+app.include_router(status.router, prefix="/api/status", tags=["Status"])
 app.include_router(admin_auth.router, prefix="/api/admin", tags=["Admin Auth"])
 app.include_router(students.router, prefix="/api/students", tags=["Students"])
 app.include_router(attendance.router, prefix="/api/attendance", tags=["Attendance"])
 app.include_router(grades.router, prefix="/api/grades", tags=["Grades"])
 app.include_router(sources.router, prefix="/api/sources", tags=["Sources"])
+
+
+@app.get("/api/rating", tags=["Students"])
+async def get_rating_alias(
+    limit: int = 3,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    from app.api.routers.students import get_students_rating
+    return await get_students_rating(limit=limit, db=db, admin=admin)
+
 
 # Mini App statik fayllari (/app)
 app.mount("/app", StaticFiles(directory=str(STATIC_DIR), html=True), name="static_app")

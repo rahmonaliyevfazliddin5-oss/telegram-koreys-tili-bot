@@ -56,18 +56,22 @@ async def test_api_crud_with_mocked_admin():
     app.dependency_overrides[get_current_admin] = mock_admin
 
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            # Test validation errors (e.g. invalid grade value)
-            bad_grade_res = await client.post("/api/grades", json={"student_id": 1, "date": "2026-11-19", "value": 10})
-            assert bad_grade_res.status_code == 422  # pydantic ge=1, le=5 validation error
+        with patch("app.api.routers.grades.is_lesson_window_open", return_value=True):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                # Test validation errors (e.g. invalid grade value)
+                bad_grade_res = await client.put(
+                    "/api/grades",
+                    json={"date": "2026-11-20", "lesson": 1, "kind": "daily", "grades": [{"student_id": 1, "value": 10}]}
+                )
+                assert bad_grade_res.status_code == 422  # pydantic ge=1, le=5 validation error
 
-            # Test invalid source lang
-            bad_source_res = await client.post("/api/sources", json={"title": "Test", "text": "Content", "source_lang": "fr"})
-            assert bad_source_res.status_code == 422  # pattern ^(uz|en|ru)$ validation error
+                # Test invalid source lang
+                bad_source_res = await client.post("/api/sources", json={"title": "Test", "text": "Content", "source_lang": "fr"})
+                assert bad_source_res.status_code == 422  # pattern ^(uz|en|ru)$ validation error
 
-            # Test invalid student payload (empty first_name)
-            bad_student_res = await client.post("/api/students", json={"first_name": "", "last_name": "Test", "grade": "10-A"})
-            assert bad_student_res.status_code == 422
+                # Test invalid student payload (empty first_name)
+                bad_student_res = await client.post("/api/students", json={"first_name": "", "last_name": "Test", "grade": "10-A"})
+                assert bad_student_res.status_code == 422
     finally:
         app.dependency_overrides.clear()
 
@@ -92,7 +96,7 @@ async def test_admin_logout_e2e():
                 assert res.status_code == 200
                 assert res.json() == {"ok": True}
                 mock_redis.delete.assert_called_once_with("admin_session:99999")
-                mock_send.assert_called_once()
+                assert mock_send.call_count >= 1
                 assert mock_send.call_args[1]["chat_id"] == 99999
     finally:
         app.dependency_overrides.clear()

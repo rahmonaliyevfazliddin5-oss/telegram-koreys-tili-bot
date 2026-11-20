@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
@@ -18,18 +18,45 @@ def get_language_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def get_main_menu_keyboard(lang: str, resource_titles: List[str]) -> ReplyKeyboardMarkup:
+def get_main_menu_keyboard(lang: str = "uz", resource_titles: Optional[List[str]] = None) -> ReplyKeyboardMarkup:
     rating_text = get_text("rating_btn", lang)
-    keyboard = [[KeyboardButton(text=rating_text)]]
-    
-    for title in resource_titles:
-        keyboard.append([KeyboardButton(text=title)])
-        
+    students_text = get_text("students_btn", lang)
+    attendance_text = get_text("attendance_btn", lang)
+    teacher_text = get_text("teacher_btn", lang)
+    contact_text = get_text("contact_btn", lang)
+
+    keyboard = [
+        [KeyboardButton(text=rating_text), KeyboardButton(text=students_text)],
+        [KeyboardButton(text=attendance_text), KeyboardButton(text=teacher_text)],
+        [KeyboardButton(text=contact_text)]
+    ]
+
+    if resource_titles:
+        for title in resource_titles:
+            keyboard.append([KeyboardButton(text=title)])
+
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
         resize_keyboard=True,
         is_persistent=True
     )
+
+
+def get_students_pagination_keyboard(current_page: int, total_pages: int) -> InlineKeyboardMarkup:
+    buttons = []
+    if current_page > 1:
+        buttons.append(
+            InlineKeyboardButton(text="<", callback_data=f"std_page:{current_page - 1}")
+        )
+    if current_page < total_pages:
+        buttons.append(
+            InlineKeyboardButton(text=">", callback_data=f"std_page:{current_page + 1}")
+        )
+
+    if not buttons:
+        return InlineKeyboardMarkup(inline_keyboard=[])
+
+    return InlineKeyboardMarkup(inline_keyboard=[buttons])
 
 
 def get_rating_pagination_keyboard(current_page: int, total_pages: int) -> InlineKeyboardMarkup:
@@ -42,8 +69,8 @@ def get_rating_pagination_keyboard(current_page: int, total_pages: int) -> Inlin
         buttons.append(
             InlineKeyboardButton(text=">", callback_data=f"rate_page:{current_page + 1}")
         )
-    
+
     if not buttons:
         return InlineKeyboardMarkup(inline_keyboard=[])
-    
+
     return InlineKeyboardMarkup(inline_keyboard=[buttons])

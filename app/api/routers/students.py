@@ -1,15 +1,39 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.api.deps import get_current_admin
 from app.models.student import Student
-from app.schemas.student import StudentCreate, StudentUpdate, StudentResponse
+from app.models.attendance import Absence
+from app.models.grade import Grade
+from app.models.fine_ledger import FineLedger
+from app.schemas.student import (
+    StudentCreate,
+    StudentUpdate,
+    StudentResponse,
+    StudentProfileResponse,
+    FineCreate,
+    CollectCreate,
+    LedgerResponse
+)
 from app.services.cache_service import invalidate_rating_cache
 
 router = APIRouter()
+
+
+async def get_student_debt(db: AsyncSession, student_id: int) -> int:
+    """O'quvchining jami qarzini hisoblaydi (fines - payments >= 0)."""
+    fines_stmt = select(func.coalesce(func.sum(FineLedger.amount), 0)).where(
+        and_(FineLedger.student_id == student_id, FineLedger.type == "fine")
+    )
+    payments_stmt = select(func.coalesce(func.sum(FineLedger.amount), 0)).where(
+        and_(FineLedger.student_id == student_id, FineLedger.type == "payment")
+    )
+    fines = (await db.execute(fines_stmt)).scalar_one()
+    payments = (await db.execute(payments_stmt)).scalar_one()
+    return max(0, int(fines - payments))
 
 
 @router.get("", response_model=List[StudentResponse])
@@ -35,6 +59,22 @@ async def get_students(
     return result.scalars().all()
 
 
+@router.get("/rating")
+async def get_students_rating(
+    limit: int = Query(3, ge=1, le=100, description="Reytingdagi o'quvchilar soni (masalan 3 ta)"),
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """
+    O'quvchilar reytingi (FAQAT ball > 0 bo'lganlar).
+    Bosh sahifa TOP-3 reyting kartasi uchun limit=3 qilib chaqiriladi.
+    """
+    from app.services.rating_service import calculate_and_cache_rating
+    rating_list = await calculate_and_cache_rating(db)
+    top_items = [item for item in (rating_list or []) if item.get("total_score", 0) > 0][:limit]
+    return top_items
+
+
 @router.get("/{student_id}", response_model=StudentResponse)
 async def get_student(
     student_id: int,
@@ -51,6 +91,186 @@ async def get_student(
             detail="O'quvchi topilmadi"
         )
     return student
+
+
+@router.get("/{student_id}/profile", response_model=StudentProfileResponse)
+async def get_student_profile(
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """
+    O'quvchi profili:
+    - Asosiy ma'lumotlar
+    - Statistika: Jami dars qoldirgan, Jami ball, Jami qarz
+    - Jarima va to'lovlar amallar tarixi
+    """
+    stmt = select(Student).where(Student.id == student_id)
+    result = await db.execute(stmt)
+    student = result.scalar_one_or_none()
+
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="O'quvchi topilmadi"
+        )
+
+    # 1. Jami dars qoldirishlar soni
+    abs_stmt = select(func.count(Absence.id)).where(Absence.student_id == student_id)
+    total_absences = (await db.execute(abs_stmt)).scalar_one() or 0
+
+    # 2. Jami ballar yig'indisi
+    grades_stmt = select(func.coalesce(func.sum(Grade.value), 0)).where(Grade.student_id == student_id)
+    total_score = (await db.execute(grades_stmt)).scalar_one() or 0
+
+    # 3. Jami qarz
+    total_debt = await get_student_debt(db, student_id)
+
+    # 4. Amallar tarixi
+    ledger_stmt = (
+        select(FineLedger)
+        .where(FineLedger.student_id == student_id)
+        .order_by(FineLedger.created_at.desc())
+        .limit(50)
+    )
+    ledger_items = (await db.execute(ledger_stmt)).scalars().all()
+
+    history = [
+        {
+            "id": item.id,
+            "type": item.type,
+            "amount": item.amount,
+            "created_at": item.created_at
+        }
+        for item in ledger_items
+    ]
+
+    student_dict = {
+        "id": student.id,
+        "first_name": student.first_name,
+        "last_name": student.last_name or "",
+        "grade": student.grade
+    }
+
+    stats = {
+        "total_absences": int(total_absences),
+        "total_score": int(total_score),
+        "total_debt": total_debt
+    }
+
+    return {
+        "id": student.id,
+        "first_name": student.first_name,
+        "last_name": student.last_name or "",
+        "grade": student.grade,
+        "total_absences": int(total_absences),
+        "total_score": int(total_score),
+        "total_debt": total_debt,
+        "student": student_dict,
+        "stats": stats,
+        "history": history
+    }
+
+
+@router.post("/{student_id}/fine", response_model=LedgerResponse)
+async def add_fine(
+    student_id: int,
+    payload: FineCreate,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """
+    O'quvchiga jarima belgilash (+10 000 so'm yoki ixtiyoriy musbat summa).
+    """
+    student = await db.get(Student, student_id)
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="O'quvchi topilmadi"
+        )
+
+    amount = payload.amount or 10000
+    if amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Jarima summasi noldan katta bo'lishi shart"
+        )
+
+    ledger_entry = FineLedger(
+        student_id=student_id,
+        type="fine",
+        amount=amount
+    )
+    db.add(ledger_entry)
+    await db.commit()
+
+    total_debt = await get_student_debt(db, student_id)
+
+    return {
+        "ok": True,
+        "student_id": student_id,
+        "type": "fine",
+        "amount": amount,
+        "total_debt": total_debt,
+        "stats": {"total_debt": total_debt}
+    }
+
+
+@router.post("/{student_id}/collect", response_model=LedgerResponse)
+async def collect_debt(
+    student_id: int,
+    payload: CollectCreate,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """
+    O'quvchidan qarz undirish (to'lov kiritish).
+    Jami qarz hech qachon manfiy bo'lmaydi.
+    """
+    student = await db.get(Student, student_id)
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="O'quvchi topilmadi"
+        )
+
+    if payload.amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="To'lov summasi noldan katta bo'lishi shart"
+        )
+
+    current_debt = await get_student_debt(db, student_id)
+    if current_debt <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O'quvchining qarzi mavjud emas"
+        )
+
+    if payload.amount > current_debt:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"To'lov summasi ({payload.amount}) jami qarzdan ({current_debt}) oshib ketishi mumkin emas"
+        )
+
+    ledger_entry = FineLedger(
+        student_id=student_id,
+        type="payment",
+        amount=payload.amount
+    )
+    db.add(ledger_entry)
+    await db.commit()
+
+    new_debt = await get_student_debt(db, student_id)
+
+    return {
+        "ok": True,
+        "student_id": student_id,
+        "type": "payment",
+        "amount": payload.amount,
+        "total_debt": new_debt,
+        "stats": {"total_debt": new_debt}
+    }
 
 
 @router.post("", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
