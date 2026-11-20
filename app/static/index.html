@@ -18,7 +18,15 @@
         </svg>
       </button>
       <div class="header-title" id="headerTitle">Kurs Boshqaruvi</div>
-      <div class="header-time-pill" id="headerTimeBadge">--:--</div>
+      <div class="header-right-wrap">
+        <div class="header-time-pill" id="headerTimeBadge">--:--</div>
+        <button type="button" class="header-teacher-avatar" id="btnTeacherProfile" title="O'qituvchi profili" aria-label="O'qituvchi profili">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -114,30 +122,48 @@
         </div>
       </div>
 
-      <!-- Ikki tugma qatori (Davomat, Baholash) -->
-      <div class="two-buttons-row">
-        <button type="button" class="action-tile-btn tile-attendance" id="btnQuickAttendance">
-          <div class="tile-icon-wrap icon-att">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-              <path d="m9 16 2 2 4-4"></path>
-            </svg>
+      <!-- Bugungi darslar (3 ta karta: 1-dars 07:00, 2-dars 15:45, Imtihon) -->
+      <div class="today-lessons-section">
+        <div class="section-title">Bugungi darslar</div>
+        <div class="today-lessons-grid">
+          <!-- 1-dars karta -->
+          <div class="lesson-card" id="cardTodayLesson1" data-lesson="1">
+            <div class="lesson-card-top">
+              <span class="lesson-card-title">1-dars 07:00</span>
+              <span class="lesson-card-badge" id="badgeLesson1">Boshlanmagan</span>
+            </div>
+            <div class="lesson-card-topic" id="topicLesson1">Oyna: 07:00 - 12:00</div>
           </div>
-          <div class="tile-title">Davomat</div>
-          <div class="tile-desc">Dars davomatini belgilash</div>
-        </button>
 
-        <button type="button" class="action-tile-btn tile-grades" id="btnQuickGrades">
-          <div class="tile-icon-wrap icon-gra">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-            </svg>
+          <!-- 2-dars karta -->
+          <div class="lesson-card" id="cardTodayLesson2" data-lesson="2">
+            <div class="lesson-card-top">
+              <span class="lesson-card-title">2-dars 15:45</span>
+              <span class="lesson-card-badge" id="badgeLesson2">Boshlanmagan</span>
+            </div>
+            <div class="lesson-card-topic" id="topicLesson2">Oyna: 15:30 - 20:00</div>
           </div>
+
+          <!-- Imtihon karta -->
+          <div class="lesson-card lesson-card-exam" id="cardTodayExam">
+            <div class="lesson-card-top">
+              <span class="lesson-card-title">Imtihon</span>
+              <span class="lesson-card-badge" id="badgeExam">Boshlanmagan</span>
+            </div>
+            <div class="lesson-card-topic" id="topicExam">Oraliq va yakuniy testlar</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tezkor tugmalar (moslik uchun) -->
+      <div class="two-buttons-row" style="display: none;">
+        <button type="button" class="action-tile-btn tile-attendance" id="btnQuickAttendance">
+          <div class="tile-icon-wrap icon-att"></div>
+          <div class="tile-title">Davomat</div>
+        </button>
+        <button type="button" class="action-tile-btn tile-grades" id="btnQuickGrades">
+          <div class="tile-icon-wrap icon-gra"></div>
           <div class="tile-title">Baholash</div>
-          <div class="tile-desc">Kundalik va imtihon baholari</div>
         </button>
       </div>
 
@@ -266,6 +292,17 @@
         </button>
       </div>
 
+      <!-- Dars mavzusi paneli -->
+      <div class="lesson-topic-bar" id="attLessonTopicBar">
+        <span class="topic-label">Mavzu:</span>
+        <span class="topic-text" id="attLessonTopicText">Mavzu kiritilmagan</span>
+      </div>
+
+      <!-- Mavzu kiritilmagan ogohlantirish banneri -->
+      <div class="topic-warning-banner hidden" id="attTopicWarningBanner">
+        Avval dars mavzusini kiriting
+      </div>
+
       <!-- Tanlangan sana sarlavhasi va statistikasi -->
       <div class="date-summary-bar">
         <div class="date-summary-title" id="attSelectedDateTitle">Bugun</div>
@@ -277,10 +314,10 @@
         <div class="skeleton-card"></div>
       </div>
 
-      <!-- Davomat o'quvchilar ro'yxati: Har o'quvchida FAQAT bitta 'Kelmadi' tugmasi -->
+      <!-- Davomat o'quvchilar ro'yxati -->
       <div id="attendanceList" class="items-list with-bottom-action"></div>
 
-      <!-- Katta Qizil Saqlash Tugmasi (Oyna yopiq bo'lsa qora) -->
+      <!-- Saqlash Tugmasi (Oyna yopiq bo'lsa qora tugma) -->
       <div class="sticky-action-bar">
         <button type="button" class="btn btn-primary btn-block btn-save-action" id="btnSaveAttendance">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -343,10 +380,21 @@
         </button>
       </div>
 
-      <!-- Segment: Kundalik | Imtihon -->
+      <!-- Segment: Dars bahosi | Imtihon -->
       <div class="segment-wrap">
-        <button type="button" class="segment-btn active" id="btnGradeKindDaily" data-kind="daily">Kundalik</button>
+        <button type="button" class="segment-btn active" id="btnGradeKindDaily" data-kind="daily">Dars bahosi</button>
         <button type="button" class="segment-btn" id="btnGradeKindExam" data-kind="exam">Imtihon</button>
+      </div>
+
+      <!-- Dars mavzusi paneli -->
+      <div class="lesson-topic-bar" id="gradeLessonTopicBar">
+        <span class="topic-label">Mavzu:</span>
+        <span class="topic-text" id="gradeLessonTopicText">Mavzu kiritilmagan</span>
+      </div>
+
+      <!-- Mavzu kiritilmagan ogohlantirish banneri -->
+      <div class="topic-warning-banner hidden" id="gradeTopicWarningBanner">
+        Avval dars mavzusini kiriting
       </div>
 
       <!-- Tanlangan sana sarlavhasi -->
@@ -360,10 +408,17 @@
         <div class="skeleton-card"></div>
       </div>
 
-      <!-- Baholar ro'yxati (1-5 tugmalari) -->
-      <div id="gradesList" class="items-list with-bottom-action"></div>
+      <!-- Dars baholari ro'yxati -->
+      <div id="gradesDailyContainer">
+        <div id="gradesList" class="items-list with-bottom-action"></div>
+      </div>
 
-      <!-- Katta Qizil Saqlash Tugmasi (Oyna yopiq bo'lsa qora) -->
+      <!-- Imtihonlar bo'limi -->
+      <div id="gradesExamContainer" class="hidden">
+        <div id="examsList" class="items-list with-bottom-action"></div>
+      </div>
+
+      <!-- Saqlash Tugmasi (Oyna yopiq bo'lsa qora tugma) -->
       <div class="sticky-action-bar">
         <button type="button" class="btn btn-primary btn-block btn-save-action" id="btnSaveGrades">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -378,73 +433,35 @@
 
     <!-- 5. SOZLAMALAR BO'LIMI -->
     <section id="tabSettings" class="tab-content">
+      <!-- Admin Parolini o'zgartirish kartasi -->
       <div class="card settings-card">
-        <div class="settings-header">
+        <div class="settings-card-header">
           <div class="settings-icon-wrap">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
           </div>
           <div>
-            <div class="settings-title">Parolni almashtirish</div>
-            <div class="settings-desc">Admin paneliga kirish xavfsizlik parolini o'zgartirish</div>
+            <div class="settings-card-title">Xavfsizlik kodi</div>
+            <div class="settings-card-sub">Admin kirish kodini o'zgartirish</div>
           </div>
         </div>
 
         <form id="formChangePassword" class="settings-form">
           <div class="form-group">
-            <label for="pwdOld">Eski parol</label>
-            <div class="password-input-wrap">
-              <input type="password" id="pwdOld" class="form-input" required autocomplete="current-password" placeholder="Eski parolni kiriting">
-              <button type="button" class="pwd-toggle-btn" data-target="pwdOld" aria-label="Parolni ko'rsatish">
-                <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-                <svg class="eye-closed hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                  <line x1="1" y1="1" x2="23" y2="23"></line>
-                </svg>
-              </button>
-            </div>
+            <label for="oldPasswordInput">Eski xavfsizlik kodi</label>
+            <input type="password" id="oldPasswordInput" class="form-input" required placeholder="Joriy kodni kiriting">
           </div>
-
           <div class="form-group">
-            <label for="pwdNew">Yangi parol</label>
-            <div class="password-input-wrap">
-              <input type="password" id="pwdNew" class="form-input" required autocomplete="new-password" placeholder="Kamida 4 ta belgi">
-              <button type="button" class="pwd-toggle-btn" data-target="pwdNew" aria-label="Parolni ko'rsatish">
-                <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-                <svg class="eye-closed hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                  <line x1="1" y1="1" x2="23" y2="23"></line>
-                </svg>
-              </button>
-            </div>
+            <label for="newPasswordInput">Yangi xavfsizlik kodi</label>
+            <input type="password" id="newPasswordInput" class="form-input" required minlength="4" placeholder="Kamida 4 belgi">
           </div>
-
           <div class="form-group">
-            <label for="pwdConfirm">Yangi parolni takrorlash</label>
-            <div class="password-input-wrap">
-              <input type="password" id="pwdConfirm" class="form-input" required autocomplete="new-password" placeholder="Yangi parolni tasdiqlang">
-              <button type="button" class="pwd-toggle-btn" data-target="pwdConfirm" aria-label="Parolni ko'rsatish">
-                <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-                <svg class="eye-closed hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                  <line x1="1" y1="1" x2="23" y2="23"></line>
-                </svg>
-              </button>
-            </div>
+            <label for="confirmPasswordInput">Yangi kodni tasdiqlang</label>
+            <input type="password" id="confirmPasswordInput" class="form-input" required placeholder="Kodni qayta kiriting">
           </div>
-
-          <button type="submit" class="btn btn-primary btn-block" id="btnSavePassword">Saqlash</button>
+          <button type="submit" class="btn btn-primary btn-block" id="btnSubmitPassword">Kodni yangilash</button>
         </form>
       </div>
 
@@ -549,7 +566,124 @@
     </button>
   </nav>
 
-  <!-- O'quvchi Profili Modali (3 raqam kartasi, jarima +10000, qarz undirish) -->
+  <!-- Bottom Sheet: Darsni boshlash / mavzuni kiritish -->
+  <div id="sheetStartLesson" class="bottom-sheet-overlay hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title-center" id="sheetStartLessonTitle">1-dars 07:00</div>
+      <form id="formStartLesson">
+        <input type="hidden" id="startLessonNo" value="1">
+        <input type="hidden" id="startLessonId" value="">
+        <div class="form-group">
+          <label for="lessonTopicInput">Dars mavzusi</label>
+          <textarea id="lessonTopicInput" class="form-textarea" rows="3" required minlength="3" maxlength="300" placeholder="Dars mavzusini kiriting..."></textarea>
+          <div class="char-counter" id="lessonTopicCounter">0 / 300</div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnSubmitStartLesson">Darsni boshlash</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet: Imtihon ochish -->
+  <div id="sheetStartExam" class="bottom-sheet-overlay hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title-center">Imtihon</div>
+      <form id="formStartExam">
+        <input type="hidden" id="startExamId" value="">
+        <div class="form-group">
+          <label for="examNameInput">Imtihon nomi</label>
+          <input type="text" id="examNameInput" class="form-input" required minlength="2" maxlength="100" placeholder="Masalan: 1-oraliq nazorat">
+        </div>
+        <div class="form-group">
+          <label for="examTopicInput">Imtihon mavzusi</label>
+          <textarea id="examTopicInput" class="form-textarea" rows="3" required minlength="3" maxlength="300" placeholder="Imtihon mavzusini kiriting..."></textarea>
+          <div class="char-counter" id="examTopicCounter">0 / 300</div>
+        </div>
+        <div class="form-group">
+          <label>Qaysi darsda o'tkaziladi</label>
+          <div class="exam-lesson-picker">
+            <button type="button" class="exam-picker-btn active" id="btnExamLesson1" data-lesson="1">1-dars</button>
+            <button type="button" class="exam-picker-btn" id="btnExamLesson2" data-lesson="2">2-dars</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnSubmitStartExam">Imtihonni boshlash</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet: Kech qoldi -->
+  <div id="sheetLateArrival" class="bottom-sheet-overlay hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title-center" id="sheetLateTitle">Kech qoldi</div>
+      <form id="formLateArrival">
+        <input type="hidden" id="lateStudentId" value="">
+        <div class="form-group">
+          <label for="lateAmountInput">Kech qolish miqdori</label>
+          <input type="number" id="lateAmountInput" class="form-input text-center font-xl" inputmode="numeric" required min="1" max="600" placeholder="15">
+        </div>
+        <div class="unit-toggle-wrap">
+          <button type="button" class="unit-btn active" id="btnUnitMinutes" data-unit="minute">daqiqa</button>
+          <button type="button" class="unit-btn" id="btnUnitHours" data-unit="hour">soat</button>
+        </div>
+        <div class="late-actions-row">
+          <button type="button" class="btn btn-secondary" id="btnLateCancel">Bekor qilish</button>
+          <button type="submit" class="btn btn-primary" id="btnLateConfirm">Tasdiqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet: Kundalik baho tanlash (1-5) -->
+  <div id="sheetDailyGradePicker" class="bottom-sheet-overlay hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title-center">Dars bahosi</div>
+      <div class="sheet-subtitle-center" id="sheetDailyGradeStudentName">O'quvchi ismi</div>
+      <div class="grade-picker-grid">
+        <button type="button" class="grade-circle-btn" data-val="1">1</button>
+        <button type="button" class="grade-circle-btn" data-val="2">2</button>
+        <button type="button" class="grade-circle-btn" data-val="3">3</button>
+        <button type="button" class="grade-circle-btn" data-val="4">4</button>
+        <button type="button" class="grade-circle-btn" data-val="5">5</button>
+      </div>
+      <div class="sheet-clear-wrap">
+        <button type="button" class="btn-clear-grade" id="btnClearDailyGrade">Bahoni o'chirish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet: Imtihon bahosi va modifikator (+, −) -->
+  <div id="sheetExamGradePicker" class="bottom-sheet-overlay hidden">
+    <div class="bottom-sheet-backdrop"></div>
+    <div class="bottom-sheet-panel">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title-center" id="sheetExamGradeTitle">Imtihon</div>
+      <div class="sheet-subtitle-center" id="sheetExamGradeStudentName">O'quvchi ismi</div>
+      <div class="grade-picker-grid">
+        <button type="button" class="grade-circle-btn" data-exam-val="1">1</button>
+        <button type="button" class="grade-circle-btn" data-exam-val="2">2</button>
+        <button type="button" class="grade-circle-btn" data-exam-val="3">3</button>
+        <button type="button" class="grade-circle-btn" data-exam-val="4">4</button>
+        <button type="button" class="grade-circle-btn" data-exam-val="5">5</button>
+      </div>
+      <div class="modifier-picker-wrap">
+        <button type="button" class="modifier-btn" id="btnModMinus" data-mod="minus">−</button>
+        <button type="button" class="modifier-btn active" id="btnModNone" data-mod="">belgisiz</button>
+        <button type="button" class="modifier-btn" id="btnModPlus" data-mod="plus">+</button>
+      </div>
+      <div class="sheet-clear-wrap">
+        <button type="button" class="btn-clear-grade" id="btnClearExamGrade">Bahoni o'chirish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- O'quvchi Profili Modali (6 ta metrika kartasi, amallar tarixi, davomat tarixi) -->
   <div id="modalStudentProfile" class="modal-overlay hidden">
     <div class="modal-backdrop"></div>
     <div class="profile-card-sheet">
@@ -587,38 +721,34 @@
           </div>
         </div>
 
-        <!-- 3 ta raqam kartasi -->
+        <!-- 6 ta raqam kartasi -->
         <div class="profile-stats-grid">
           <div class="card stat-box">
-            <div class="stat-icon-wrap stat-absent">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="15" y1="9" x2="9" y2="15"></line>
-                <line x1="9" y1="9" x2="15" y2="15"></line>
-              </svg>
-            </div>
             <div class="stat-val text-danger" id="profTotalAbsences">0 ta</div>
             <div class="stat-lbl">Jami dars qoldirgan</div>
           </div>
 
           <div class="card stat-box">
-            <div class="stat-icon-wrap stat-score">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-              </svg>
-            </div>
+            <div class="stat-val text-warning" id="profTotalLates">0 ta</div>
+            <div class="stat-lbl">Jami kech qolgan</div>
+          </div>
+
+          <div class="card stat-box">
             <div class="stat-val text-gold" id="profTotalScore">0 ball</div>
             <div class="stat-lbl">Jami ball</div>
           </div>
 
           <div class="card stat-box">
-            <div class="stat-icon-wrap stat-debt">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="6" width="20" height="12" rx="2"></rect>
-                <circle cx="12" cy="12" r="2"></circle>
-                <path d="M6 12h.01M18 12h.01"></path>
-              </svg>
-            </div>
+            <div class="stat-val text-primary" id="profDailyScore">0 ball</div>
+            <div class="stat-lbl">Dars jarayonida olgan ball</div>
+          </div>
+
+          <div class="card stat-box">
+            <div class="stat-val text-primary" id="profExamScore">0 ball</div>
+            <div class="stat-lbl">Imtihon bali</div>
+          </div>
+
+          <div class="card stat-box">
             <div class="stat-val" id="profTotalDebt">0 so'm</div>
             <div class="stat-lbl">Jami qarz</div>
           </div>
@@ -651,6 +781,70 @@
           </div>
           <div class="history-items-list" id="profHistoryList"></div>
         </div>
+
+        <!-- Oxirgi davomat yozuvlari ro'yxati -->
+        <div class="card profile-history-section">
+          <div class="history-title-row">
+            <div class="history-section-title">Davomat yozuvlari</div>
+          </div>
+          <div class="history-items-list" id="profAttHistoryList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- O'qituvchi Profili Modali -->
+  <div id="modalTeacherProfile" class="modal-overlay hidden">
+    <div class="modal-backdrop"></div>
+    <div class="profile-card-sheet">
+      <div class="profile-header-bar">
+        <button class="profile-close-btn" id="btnCloseTeacherProfile" aria-label="Orqaga">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="profile-header-title">O'qituvchi profili</div>
+        <div style="width: 36px;"></div>
+      </div>
+
+      <div class="profile-body-scroll">
+        <!-- 2 ta raqam kartasi -->
+        <div class="teacher-stats-grid">
+          <div class="card stat-box">
+            <div class="stat-val text-primary" id="teacherTotalLessons">0</div>
+            <div class="stat-lbl">O'tgan darslar</div>
+          </div>
+          <div class="card stat-box">
+            <div class="stat-val text-primary" id="teacherTotalExams">0</div>
+            <div class="stat-lbl">O'tkazilgan imtihonlar</div>
+          </div>
+        </div>
+
+        <!-- 2 ta tab: Darslar | Imtihonlar -->
+        <div class="teacher-tab-bar">
+          <button type="button" class="teacher-tab-btn active" id="btnTeacherTabLessons">Darslar</button>
+          <button type="button" class="teacher-tab-btn" id="btnTeacherTabExams">Imtihonlar</button>
+        </div>
+
+        <!-- Oy almashtirgich -->
+        <div class="teacher-month-switcher">
+          <button class="cal-nav-btn" id="btnTeacherMonthPrev" aria-label="Oldingi oy">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <div class="teacher-month-title" id="teacherMonthTitle">Noyabr 2026</div>
+          <button class="cal-nav-btn" id="btnTeacherMonthNext" aria-label="Keyingi oy">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Darslar ro'yxati -->
+        <div id="teacherLessonsList" class="teacher-items-list"></div>
+        <!-- Imtihonlar ro'yxati -->
+        <div id="teacherExamsList" class="teacher-items-list hidden"></div>
       </div>
     </div>
   </div>

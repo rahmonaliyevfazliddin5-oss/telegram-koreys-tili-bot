@@ -2102,6 +2102,584 @@ body {
 }
 
 /* ====================================================
+   YANGILANGAN QISMLAR (Section 7 Yangilanishlari)
+   ==================================================== */
+
+/* Header o'ng qism */
+.header-right-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.header-teacher-avatar {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: var(--text-white);
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.header-teacher-avatar:active {
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(0.92);
+}
+
+/* 1. Bugungi darslar kartalari */
+.today-lessons-section {
+  margin-bottom: 16px;
+}
+
+.today-lessons-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.lesson-card {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lesson-card:active:not(.closed) {
+  transform: scale(0.98);
+  background: #FFF7F8;
+}
+
+.lesson-card.closed {
+  background: var(--color-dark-closed);
+  border-color: #374151;
+  color: var(--color-dark-closed-text);
+  cursor: not-allowed;
+  opacity: 0.95;
+}
+
+.lesson-card.closed .lesson-card-title {
+  color: #9CA3AF;
+}
+
+.lesson-card.closed .lesson-card-topic {
+  color: #6B7280;
+}
+
+.lesson-card.closed .lesson-card-badge {
+  background: #374151;
+  color: #9CA3AF;
+  border-color: #4B5563;
+}
+
+.lesson-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.lesson-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.lesson-card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--bg-page);
+  color: var(--text-secondary);
+}
+
+.lesson-card-badge.badge-started {
+  background: #ECFDF5;
+  color: #059669;
+  border-color: #A7F3D0;
+}
+
+.lesson-card-badge.badge-not-started {
+  background: #FEF3C7;
+  color: #D97706;
+  border-color: #FDE68A;
+}
+
+.lesson-card-badge.badge-closed {
+  background: #374151;
+  color: #9CA3AF;
+  border-color: #4B5563;
+}
+
+.lesson-card-topic {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dars mavzusi paneli va ogohlantirish */
+.lesson-topic-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-chip);
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.lesson-topic-bar .topic-label {
+  font-weight: 700;
+  color: var(--primary-red);
+}
+
+.lesson-topic-bar .topic-text {
+  color: var(--text-main);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topic-warning-banner {
+  padding: 10px 14px;
+  background: #FEF2F2;
+  border: 1px solid #FECDD3;
+  border-radius: var(--radius-chip);
+  color: var(--primary-red);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+/* Davomat: Kelmadi va Kech qoldi tugmalari */
+.att-actions-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-att-absent,
+.btn-att-late {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--color-border);
+  background: #FFFFFF;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-att-absent:active,
+.btn-att-late:active {
+  transform: scale(0.95);
+}
+
+.btn-att-absent.is-absent {
+  background: var(--primary-red);
+  border-color: var(--primary-red);
+  color: #FFFFFF;
+}
+
+.btn-att-late.is-late {
+  background: #D97706;
+  border-color: #D97706;
+  color: #FFFFFF;
+}
+
+.chip-late-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-chip);
+  background: #FEF3C7;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Kech qoldi bottom sheet */
+.unit-toggle-wrap {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.unit-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-border);
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.unit-btn.active {
+  background: var(--primary-red);
+  border-color: var(--primary-red);
+  color: #FFFFFF;
+}
+
+.late-actions-row {
+  display: flex;
+  gap: 10px;
+}
+
+.late-actions-row .btn {
+  flex: 1;
+}
+
+/* Baholash: segment va picker */
+.segment-wrap {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  background: #FFFFFF;
+  padding: 4px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-border);
+}
+
+.segment-btn {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  border-radius: var(--radius-chip);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.segment-btn.active {
+  background: var(--primary-red);
+  color: #FFFFFF;
+}
+
+.grade-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.grade-circle-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: #FFFFFF;
+  color: var(--text-main);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grade-circle-btn.active {
+  background: var(--primary-red);
+  border-color: var(--primary-red);
+  color: #FFFFFF;
+  transform: scale(1.08);
+}
+
+.modifier-picker-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.modifier-btn {
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modifier-btn.active {
+  background: var(--primary-red);
+  border-color: var(--primary-red);
+  color: #FFFFFF;
+}
+
+.modifier-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sheet-clear-wrap {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.btn-clear-grade {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px;
+  text-decoration: underline;
+}
+
+.chip-grade-badge {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-chip);
+  background: #FFF0F2;
+  color: var(--primary-red);
+  border: 1px solid var(--primary-red-border);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.chip-grade-badge.empty {
+  background: #F3F4F6;
+  color: #9CA3AF;
+  border-color: #E5E7EB;
+}
+
+.chip-grade-sub {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Imtihon start sheet dars tanlovi */
+.exam-lesson-picker {
+  display: flex;
+  gap: 8px;
+}
+
+.exam-picker-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-border);
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.exam-picker-btn.active {
+  background: var(--primary-red);
+  border-color: var(--primary-red);
+  color: #FFFFFF;
+}
+
+.char-counter {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* O'qituvchi profili modal */
+.teacher-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.teacher-tab-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  background: #FFFFFF;
+  padding: 4px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-border);
+}
+
+.teacher-tab-btn {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  border-radius: var(--radius-chip);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.teacher-tab-btn.active {
+  background: var(--primary-red);
+  color: #FFFFFF;
+}
+
+.teacher-month-switcher {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 8px 12px;
+}
+
+.teacher-month-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.teacher-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.teacher-day-card {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.teacher-day-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-red);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.teacher-lesson-row {
+  padding: 6px 0;
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.teacher-lesson-num {
+  font-weight: 600;
+  color: var(--text-main);
+  min-width: 60px;
+}
+
+.teacher-lesson-topic {
+  color: var(--text-secondary);
+  flex: 1;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 8px;
+}
+
+.teacher-exam-card {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+}
+
+.teacher-exam-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.teacher-exam-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stat-box {
+  padding: 12px;
+  text-align: center;
+  border-radius: var(--radius-card);
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+}
+
+.stat-val {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.stat-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* ====================================================
    6. MOSLASHUVCHANLIK (RESPONSIVE: 320px, 375px, 430px)
    ==================================================== */
 @media (max-width: 360px) {

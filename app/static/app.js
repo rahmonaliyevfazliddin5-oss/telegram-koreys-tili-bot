@@ -145,7 +145,15 @@ function createSvgIcon(name, size = 18, strokeWidth = 2) {
 async function handleBackNavigation() {
   haptic.impact("light");
 
-  // 1. Ochiq profil modalini yopish
+  // 1. Ochiq o'qituvchi profil modalini yopish
+  const teacherModal = document.getElementById("modalTeacherProfile");
+  if (teacherModal && !teacherModal.classList.contains("hidden")) {
+    teacherModal.classList.add("hidden");
+    updateBackButton();
+    return;
+  }
+
+  // 2. Ochiq profil modalini yopish
   const profileModal = document.getElementById("modalStudentProfile");
   if (profileModal && !profileModal.classList.contains("hidden")) {
     profileModal.classList.add("hidden");
@@ -153,20 +161,27 @@ async function handleBackNavigation() {
     return;
   }
 
-  // 2. Ochiq bottom sheet yoki modalni yopish
+  // 3. Ochiq bottom sheet yoki modalni yopish
   const anyOpenModal = document.querySelector(".modal-overlay:not(.hidden), .bottom-sheet-overlay:not(.hidden)");
   if (anyOpenModal) {
     closeAllSheetsAndModals();
     return;
   }
 
-  // 3. Agar bosh sahifada bo'lmasa, Bosh sahifaga qaytish
+  // 4. Imtihon ichidagi o'quvchilar ro'yxatidan orqaga qaytish
+  if (currentTabId === "tabGrades" && currentGradeKind === "exam" && selectedExam) {
+    selectedExam = null;
+    loadExamsList();
+    return;
+  }
+
+  // 5. Agar bosh sahifada bo'lmasa, Bosh sahifaga qaytish
   if (currentTabId !== "tabHome") {
     switchTab("tabHome");
     return;
   }
 
-  // 4. Bosh sahifada orqaga bosilganda POST /api/admin/logout va WebApp.close()
+  // 6. Bosh sahifada orqaga bosilganda POST /api/admin/logout va WebApp.close()
   try {
     await apiRequest("/api/admin/logout", { method: "POST" });
   } catch (err) {
@@ -178,11 +193,13 @@ async function handleBackNavigation() {
 
 function updateBackButton() {
   if (!tg?.BackButton) return;
+  const teacherModal = document.getElementById("modalTeacherProfile");
+  const isTeacherOpen = teacherModal && !teacherModal.classList.contains("hidden");
   const profileModal = document.getElementById("modalStudentProfile");
   const isProfileOpen = profileModal && !profileModal.classList.contains("hidden");
   const anyModal = document.querySelector(".modal-overlay:not(.hidden), .bottom-sheet-overlay:not(.hidden)");
 
-  if (isProfileOpen || anyModal || currentTabId !== "tabHome") {
+  if (isTeacherOpen || isProfileOpen || anyModal || currentTabId !== "tabHome" || selectedExam) {
     tg.BackButton.show();
   } else {
     tg.BackButton.show();
@@ -321,6 +338,14 @@ async function apiRequest(endpoint, options = {}) {
       const err = await response.json().catch(() => ({ detail: "Dars oynasi yopiq yoki ruxsat yo'q" }));
       throw new Error(err.detail || "Ruxsat etilmagan");
     }
+    if (response.status === 409) {
+      const err = await response.json().catch(() => ({ detail: "Avval dars mavzusini kiriting" }));
+      throw new Error(err.detail || "Avval dars mavzusini kiriting");
+    }
+    if (response.status === 422) {
+      const err = await response.json().catch(() => ({ detail: "Noto'g'ri ma'lumot kiritildi" }));
+      throw new Error(err.detail || "Noto'g'ri ma'lumot kiritildi");
+    }
     if (response.status === 204) {
       return null;
     }
@@ -443,11 +468,15 @@ fabAdd?.addEventListener("click", () => {
 });
 
 // ====================================================
-// Sanalar va Vaqt Formati (24-soatlik format)
+// Sanalar va Vaqt Formati (24-soatlik format, Asia/Tashkent)
 // ====================================================
 const MONTH_NAMES_UZ = [
   "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
   "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"
+];
+
+const WEEKDAYS_UZ = [
+  "Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"
 ];
 
 function getTodayString() {
@@ -482,6 +511,19 @@ function formatDateTime24(isoStr) {
   } catch (e) {
     return isoStr;
   }
+}
+
+function formatLateMinutes(minutes) {
+  if (!minutes || minutes <= 0) return "";
+  if (minutes < 60) {
+    return `+${minutes} daqiqa kech qoldi`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const rem = minutes % 60;
+  if (rem === 0) {
+    return `+${hours} soat kech qoldi`;
+  }
+  return `+${hours} soat ${rem} daqiqa kech qoldi`;
 }
 
 // Ism bosh harflari va qizil-oq uslubidagi gradientlar
@@ -520,35 +562,11 @@ let systemStatus = {
   server_time: "",
   active_lesson: 1,
   is_blocked: false,
-  block_ttl: 0
+  block_ttl: 0,
+  lesson_1: null,
+  lesson_2: null,
+  exams_today: []
 };
-
-function computeLocalTashkentStatus() {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const tashkentDate = new Date(utc + 3600000 * 5);
-
-  const day = tashkentDate.getDay();
-  const is_weekend = day === 0 || day === 6;
-
-  const hours = tashkentDate.getHours();
-  const minutes = tashkentDate.getMinutes();
-  const timeNum = hours * 60 + minutes;
-
-  const lesson1_open = !is_weekend && timeNum >= 420 && timeNum <= 720;
-  const lesson2_open = !is_weekend && timeNum >= 930 && timeNum <= 1200;
-
-  const active_lesson = timeNum >= 840 ? 2 : 1;
-  const timeStr = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-
-  return {
-    is_weekend,
-    lesson1_open,
-    lesson2_open,
-    active_lesson,
-    current_time: timeStr
-  };
-}
 
 async function fetchStatus() {
   try {
@@ -559,6 +577,9 @@ async function fetchStatus() {
       systemStatus.is_blocked = Boolean(data.is_blocked);
       systemStatus.block_ttl = data.block_ttl || 0;
       systemStatus.active_lesson = data.active_lesson || 1;
+      systemStatus.lesson_1 = data.lesson_1 || null;
+      systemStatus.lesson_2 = data.lesson_2 || null;
+      systemStatus.exams_today = data.exams_today || [];
 
       if (data.lesson_1) {
         systemStatus.lesson1_open = Boolean(data.lesson_1.is_open);
@@ -578,17 +599,13 @@ async function fetchStatus() {
       }
     }
   } catch (e) {
-    const fallback = computeLocalTashkentStatus();
-    systemStatus.is_weekend = fallback.is_weekend;
-    systemStatus.lesson1_open = fallback.lesson1_open;
-    systemStatus.lesson2_open = fallback.lesson2_open;
-    systemStatus.active_lesson = fallback.active_lesson;
-    systemStatus.current_time = fallback.current_time;
+    console.warn("Status yuklashda xatolik:", e);
   } finally {
     const timeBadge = document.getElementById("headerTimeBadge");
     if (timeBadge && systemStatus.current_time) {
       timeBadge.textContent = systemStatus.current_time;
     }
+    updateTodayCardsUI();
     updateWindowStatusUI();
     if (currentTabId === "tabHome") {
       updateHomeStatusBanner();
@@ -608,15 +625,110 @@ function isLessonWindowOpen(lesson) {
   return false;
 }
 
+// Bugungi darslar 3 ta kartasini holatiga qarab yangilash
+function updateTodayCardsUI() {
+  // 1-dars karta
+  const card1 = document.getElementById("cardTodayLesson1");
+  const badge1 = document.getElementById("badgeLesson1");
+  const topic1 = document.getElementById("topicLesson1");
+
+  const l1 = systemStatus.lesson_1;
+  const isL1Open = systemStatus.lesson1_open && !systemStatus.is_weekend;
+
+  if (card1 && badge1 && topic1) {
+    badge1.className = "lesson-card-badge";
+    if (systemStatus.is_weekend || !isL1Open) {
+      card1.classList.add("closed");
+      badge1.classList.add("badge-closed");
+      badge1.textContent = "Yopiq";
+      topic1.textContent = l1?.topic ? l1.topic : "Oyna: 07:00 - 12:00";
+    } else {
+      card1.classList.remove("closed");
+      if (l1?.started) {
+        badge1.classList.add("badge-started");
+        badge1.textContent = "Boshlangan";
+        topic1.textContent = l1.topic || "Mavzu kiritilgan";
+      } else {
+        badge1.classList.add("badge-not-started");
+        badge1.textContent = "Boshlanmagan";
+        topic1.textContent = "Oyna: 07:00 - 12:00";
+      }
+    }
+  }
+
+  // 2-dars karta
+  const card2 = document.getElementById("cardTodayLesson2");
+  const badge2 = document.getElementById("badgeLesson2");
+  const topic2 = document.getElementById("topicLesson2");
+
+  const l2 = systemStatus.lesson_2;
+  const isL2Open = systemStatus.lesson2_open && !systemStatus.is_weekend;
+
+  if (card2 && badge2 && topic2) {
+    badge2.className = "lesson-card-badge";
+    if (systemStatus.is_weekend || !isL2Open) {
+      card2.classList.add("closed");
+      badge2.classList.add("badge-closed");
+      badge2.textContent = "Yopiq";
+      topic2.textContent = l2?.topic ? l2.topic : "Oyna: 15:30 - 20:00";
+    } else {
+      card2.classList.remove("closed");
+      if (l2?.started) {
+        badge2.classList.add("badge-started");
+        badge2.textContent = "Boshlangan";
+        topic2.textContent = l2.topic || "Mavzu kiritilgan";
+      } else {
+        badge2.classList.add("badge-not-started");
+        badge2.textContent = "Boshlanmagan";
+        topic2.textContent = "Oyna: 15:30 - 20:00";
+      }
+    }
+  }
+
+  // Imtihon karta
+  const cardExam = document.getElementById("cardTodayExam");
+  const badgeExam = document.getElementById("badgeExam");
+  const topicExam = document.getElementById("topicExam");
+
+  const anyOpen = (isL1Open || isL2Open) && !systemStatus.is_weekend;
+  const examsCount = systemStatus.exams_today ? systemStatus.exams_today.length : 0;
+
+  if (cardExam && badgeExam && topicExam) {
+    badgeExam.className = "lesson-card-badge";
+    if (systemStatus.is_weekend || !anyOpen) {
+      cardExam.classList.add("closed");
+      badgeExam.classList.add("badge-closed");
+      badgeExam.textContent = "Yopiq";
+      topicExam.textContent = examsCount > 0 ? `${examsCount} ta imtihon o'tkazildi` : "Oraliq va yakuniy testlar";
+    } else {
+      cardExam.classList.remove("closed");
+      if (examsCount > 0) {
+        badgeExam.classList.add("badge-started");
+        badgeExam.textContent = "Boshlangan";
+        topicExam.textContent = `${examsCount} ta imtihon ochilgan`;
+      } else {
+        badgeExam.classList.add("badge-not-started");
+        badgeExam.textContent = "Boshlanmagan";
+        topicExam.textContent = "Oraliq va yakuniy testlar";
+      }
+    }
+  }
+}
+
 function updateWindowStatusUI() {
+  const isAttToday = currentAttDate === getTodayString();
+  const isAttOpen = isLessonWindowOpen(currentAttLesson) && isAttToday;
+
   // Davomat oynasi holati
   const attBanner = document.getElementById("attWindowBanner");
   const attText = document.getElementById("attStatusText");
-  const isAttOpen = isLessonWindowOpen(currentAttLesson);
 
   if (attBanner && attText) {
     attBanner.classList.remove("status-open", "status-closed");
-    if (systemStatus.is_weekend) {
+    if (!isAttToday) {
+      attBanner.classList.add("status-closed");
+      attText.textContent = `Faqat ko'rish rejimi (${currentAttDate}). O'zgartirish taqiqlangan.`;
+    } else if (systemStatus.is_weekend) {
       attBanner.classList.add("status-closed");
       attText.textContent = `Dam olish kuni (Shanba/Yakshanba). Davomat yopiq. Vaqt: ${systemStatus.current_time}`;
     } else if (isAttOpen) {
@@ -628,34 +740,18 @@ function updateWindowStatusUI() {
     }
   }
 
-  // Yopiq dars oynasida qora tugmalar
-  const btnSaveAtt = document.getElementById("btnSaveAttendance");
-  if (btnSaveAtt) {
-    btnSaveAtt.disabled = !isAttOpen;
-    if (!isAttOpen) {
-      btnSaveAtt.classList.add("is-disabled-window");
-    } else {
-      btnSaveAtt.classList.remove("is-disabled-window");
-    }
-  }
+  const isGradeToday = currentGradeDate === getTodayString();
+  const isGradeOpen = isLessonWindowOpen(currentGradeLesson) && isGradeToday;
 
-  document.querySelectorAll(".btn-attendance-absent-toggle").forEach((btn) => {
-    btn.disabled = !isAttOpen;
-    if (!isAttOpen) {
-      btn.classList.add("is-disabled-window");
-    } else {
-      btn.classList.remove("is-disabled-window");
-    }
-  });
-
-  // Baholash oynasi holati
   const gradeBanner = document.getElementById("gradeWindowBanner");
   const gradeText = document.getElementById("gradeStatusText");
-  const isGradeOpen = isLessonWindowOpen(currentGradeLesson);
 
   if (gradeBanner && gradeText) {
     gradeBanner.classList.remove("status-open", "status-closed");
-    if (systemStatus.is_weekend) {
+    if (!isGradeToday) {
+      gradeBanner.classList.add("status-closed");
+      gradeText.textContent = `Faqat ko'rish rejimi (${currentGradeDate}). O'zgartirish taqiqlangan.`;
+    } else if (systemStatus.is_weekend) {
       gradeBanner.classList.add("status-closed");
       gradeText.textContent = `Dam olish kuni (Shanba/Yakshanba). Baholash yopiq. Vaqt: ${systemStatus.current_time}`;
     } else if (isGradeOpen) {
@@ -666,25 +762,6 @@ function updateWindowStatusUI() {
       gradeText.textContent = `${currentGradeLesson}-dars oynasi yopiq (${currentGradeLesson === 1 ? "07:00 - 12:00" : "15:30 - 20:00"}). Vaqt: ${systemStatus.current_time}`;
     }
   }
-
-  const btnSaveGrade = document.getElementById("btnSaveGrades");
-  if (btnSaveGrade) {
-    btnSaveGrade.disabled = !isGradeOpen;
-    if (!isGradeOpen) {
-      btnSaveGrade.classList.add("is-disabled-window");
-    } else {
-      btnSaveGrade.classList.remove("is-disabled-window");
-    }
-  }
-
-  document.querySelectorAll(".grade-btn-val").forEach((btn) => {
-    btn.disabled = !isGradeOpen;
-    if (!isGradeOpen) {
-      btn.classList.add("is-disabled-window");
-    } else {
-      btn.classList.remove("is-disabled-window");
-    }
-  });
 }
 
 // ====================================================
@@ -720,6 +797,7 @@ function updateHomeStatusBanner() {
 
 async function loadHomeDashboard() {
   updateHomeStatusBanner();
+  updateTodayCardsUI();
   await Promise.all([
     loadHomeAttendanceRing(),
     loadHomeTop3Rating(),
@@ -753,7 +831,7 @@ async function loadHomeAttendanceRing() {
 
     if (res) {
       total = res.total_students ?? 0;
-      absent = res.absent_count ?? (res.absent_ids ? res.absent_ids.length : 0);
+      absent = res.absent_count ?? 0;
       present = res.present_count ?? Math.max(0, total - absent);
 
       if (res.percentage !== undefined) {
@@ -768,14 +846,13 @@ async function loadHomeAttendanceRing() {
     if (totalEl) totalEl.textContent = String(total);
     if (percentText) percentText.textContent = `${percentage}%`;
 
-    // Halqani to'ldirish (radius 46 => aylana uzunligi = 2 * PI * 46 ≈ 289)
     if (ringFill) {
       const circumference = 289;
       const offset = circumference - (percentage / 100) * circumference;
       ringFill.style.strokeDashoffset = String(offset);
     }
   } catch (err) {
-    console.error("Halqali davomatni yuklashda xato:", err);
+    console.warn("Halqali davomatni yuklashda xato:", err);
   }
 }
 
@@ -799,6 +876,7 @@ async function loadHomeTop3Rating() {
     data.slice(0, 3).forEach((item, idx) => {
       const row = document.createElement("div");
       row.className = "top3-item-row";
+      row.style.cursor = "pointer";
 
       const rankBadge = document.createElement("div");
       const rankNum = item.rank || idx + 1;
@@ -826,6 +904,16 @@ async function loadHomeTop3Rating() {
       row.appendChild(rankBadge);
       row.appendChild(nameWrap);
       row.appendChild(scoreBadge);
+
+      row.onclick = () => {
+        haptic.impact("light");
+        openStudentProfile({
+          id: item.student_id,
+          first_name: item.first_name,
+          last_name: item.last_name,
+          grade: item.grade
+        });
+      };
 
       container.appendChild(row);
     });
@@ -883,19 +971,206 @@ document.getElementById("btnHomeAddSource")?.addEventListener("click", () => {
   openAddSourceModal();
 });
 
-// Tezkor o'tish tugmalari
-document.getElementById("btnQuickAttendance")?.addEventListener("click", () => {
-  haptic.selection();
-  switchTab("tabAttendance");
+// ====================================================
+// DARSNI BOSHLASH VA IMTIHON OCHISH (Home 3 Karta)
+// ====================================================
+const sheetStartLesson = document.getElementById("sheetStartLesson");
+const formStartLesson = document.getElementById("formStartLesson");
+const lessonTopicInput = document.getElementById("lessonTopicInput");
+const lessonTopicCounter = document.getElementById("lessonTopicCounter");
+const startLessonNo = document.getElementById("startLessonNo");
+const startLessonId = document.getElementById("startLessonId");
+const sheetStartLessonTitle = document.getElementById("sheetStartLessonTitle");
+const btnSubmitStartLesson = document.getElementById("btnSubmitStartLesson");
+
+function openStartLessonSheet(lessonNo) {
+  const isL1Open = systemStatus.lesson1_open && !systemStatus.is_weekend;
+  const isL2Open = systemStatus.lesson2_open && !systemStatus.is_weekend;
+  const isOpen = lessonNo === 1 ? isL1Open : isL2Open;
+
+  if (!isOpen) {
+    showToast(`${lessonNo}-dars oynasi hozir yopiq`, "error");
+    return;
+  }
+
+  const lessonData = lessonNo === 1 ? systemStatus.lesson_1 : systemStatus.lesson_2;
+
+  startLessonNo.value = String(lessonNo);
+  startLessonId.value = lessonData?.lesson_id ? String(lessonData.lesson_id) : "";
+  sheetStartLessonTitle.textContent = `${lessonNo}-dars ${lessonNo === 1 ? "07:00" : "15:45"}`;
+
+  if (lessonData?.started && lessonData?.topic) {
+    lessonTopicInput.value = lessonData.topic;
+    btnSubmitStartLesson.textContent = "Mavzuni yangilash";
+  } else {
+    lessonTopicInput.value = "";
+    btnSubmitStartLesson.textContent = "Darsni boshlash";
+  }
+
+  lessonTopicCounter.textContent = `${lessonTopicInput.value.length} / 300`;
+  sheetStartLesson?.classList.remove("hidden");
+  updateBackButton();
+}
+
+document.getElementById("cardTodayLesson1")?.addEventListener("click", () => {
+  haptic.impact("light");
+  openStartLessonSheet(1);
 });
 
-document.getElementById("btnQuickGrades")?.addEventListener("click", () => {
+document.getElementById("cardTodayLesson2")?.addEventListener("click", () => {
+  haptic.impact("light");
+  openStartLessonSheet(2);
+});
+
+lessonTopicInput?.addEventListener("input", () => {
+  lessonTopicCounter.textContent = `${lessonTopicInput.value.length} / 300`;
+});
+
+formStartLesson?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  haptic.impact("medium");
+
+  const topic = lessonTopicInput.value.trim();
+  if (topic.length < 3 || topic.length > 300) {
+    showToast("Dars mavzusi 3 dan 300 belgigacha bo'lishi kerak", "error");
+    return;
+  }
+
+  const lessonNo = parseInt(startLessonNo.value, 10);
+  const origText = btnSubmitStartLesson.textContent;
+  btnSubmitStartLesson.disabled = true;
+  btnSubmitStartLesson.textContent = "Saqlanmoqda...";
+
+  try {
+    await apiRequest("/api/lessons/start", {
+      method: "POST",
+      body: JSON.stringify({ lesson_no: lessonNo, topic })
+    });
+
+    haptic.notification("success");
+    showToast("Dars mavzusi muvaffaqiyatli saqlandi", "success");
+    sheetStartLesson?.classList.add("hidden");
+    updateBackButton();
+
+    await fetchStatus();
+    if (currentTabId === "tabAttendance") await loadAttendance();
+    if (currentTabId === "tabGrades") await loadGrades();
+  } catch (err) {
+  } finally {
+    btnSubmitStartLesson.disabled = false;
+    btnSubmitStartLesson.textContent = origText;
+  }
+});
+
+// Imtihon ochish sheet
+const sheetStartExam = document.getElementById("sheetStartExam");
+const formStartExam = document.getElementById("formStartExam");
+const examNameInput = document.getElementById("examNameInput");
+const examTopicInput = document.getElementById("examTopicInput");
+const examTopicCounter = document.getElementById("examTopicCounter");
+const btnExamLesson1 = document.getElementById("btnExamLesson1");
+const btnExamLesson2 = document.getElementById("btnExamLesson2");
+const btnSubmitStartExam = document.getElementById("btnSubmitStartExam");
+
+let selectedExamLesson = 1;
+
+btnExamLesson1?.addEventListener("click", () => {
   haptic.selection();
-  switchTab("tabGrades");
+  selectedExamLesson = 1;
+  btnExamLesson1.classList.add("active");
+  btnExamLesson2.classList.remove("active");
+});
+
+btnExamLesson2?.addEventListener("click", () => {
+  haptic.selection();
+  selectedExamLesson = 2;
+  btnExamLesson2.classList.add("active");
+  btnExamLesson1.classList.remove("active");
+});
+
+examTopicInput?.addEventListener("input", () => {
+  examTopicCounter.textContent = `${examTopicInput.value.length} / 300`;
+});
+
+function openStartExamSheet() {
+  const isL1Open = systemStatus.lesson1_open && !systemStatus.is_weekend;
+  const isL2Open = systemStatus.lesson2_open && !systemStatus.is_weekend;
+
+  if (!isL1Open && !isL2Open) {
+    showToast("Dars oynasi yopiq, imtihon ochish taqiqlangan", "error");
+    return;
+  }
+
+  selectedExamLesson = isL2Open ? 2 : 1;
+  if (selectedExamLesson === 2) {
+    btnExamLesson2?.classList.add("active");
+    btnExamLesson1?.classList.remove("active");
+  } else {
+    btnExamLesson1?.classList.add("active");
+    btnExamLesson2?.classList.remove("active");
+  }
+
+  examNameInput.value = "";
+  examTopicInput.value = "";
+  examTopicCounter.textContent = "0 / 300";
+
+  sheetStartExam?.classList.remove("hidden");
+  updateBackButton();
+}
+
+document.getElementById("cardTodayExam")?.addEventListener("click", () => {
+  haptic.impact("light");
+  openStartExamSheet();
+});
+
+formStartExam?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  haptic.impact("medium");
+
+  const name = examNameInput.value.trim();
+  const topic = examTopicInput.value.trim();
+
+  if (name.length < 2 || name.length > 100) {
+    showToast("Imtihon nomi kamida 2 belgi bo'lishi kerak", "error");
+    return;
+  }
+  if (topic.length < 3 || topic.length > 300) {
+    showToast("Imtihon mavzusi kamida 3 belgi bo'lishi kerak", "error");
+    return;
+  }
+
+  const origText = btnSubmitStartExam.textContent;
+  btnSubmitStartExam.disabled = true;
+  btnSubmitStartExam.textContent = "Ochilmoqda...";
+
+  try {
+    await apiRequest("/api/exams", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        topic,
+        lesson_no: selectedExamLesson
+      })
+    });
+
+    haptic.notification("success");
+    showToast("Imtihon muvaffaqiyatli ochildi", "success");
+    sheetStartExam?.classList.add("hidden");
+    updateBackButton();
+
+    await fetchStatus();
+    if (currentTabId === "tabGrades" && currentGradeKind === "exam") {
+      await loadExamsList();
+    }
+  } catch (err) {
+  } finally {
+    btnSubmitStartExam.disabled = false;
+    btnSubmitStartExam.textContent = origText;
+  }
 });
 
 // ====================================================
-// 2. O'QUVCHILAR BO'LIMI VA PROFIL
+// 2. O'QUVCHILAR BO'LIMI VA PROFIL (HARD DELETE BILAN)
 // ====================================================
 let allStudents = [];
 let selectedStudentForProfile = null;
@@ -919,7 +1194,7 @@ async function loadStudents() {
     allStudents = await apiRequest(endpoint);
     renderStudents();
   } catch (e) {
-    console.error("O'quvchilarni yuklashda xato:", e);
+    console.warn("O'quvchilarni yuklashda xato:", e);
   } finally {
     studentsLoaderEl?.classList.add("hidden");
   }
@@ -1014,18 +1289,13 @@ function renderStudents() {
   });
 }
 
-// O'quvchi Profili Modali (3 raqam kartasi, jarima, qarz undirish)
+// O'quvchi Profili Modali (6 ta metrika kartasi, amallar va davomat tarixi)
 async function openStudentProfile(st) {
   selectedStudentForProfile = st;
 
   const profAvatar = document.getElementById("profAvatar");
   const profName = document.getElementById("profName");
   const profGrade = document.getElementById("profGrade");
-  const profAbsences = document.getElementById("profTotalAbsences");
-  const profScore = document.getElementById("profTotalScore");
-  const profDebt = document.getElementById("profTotalDebt");
-  const profHistoryList = document.getElementById("profHistoryList");
-  const profHistoryCount = document.getElementById("profHistoryCount");
 
   const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
 
@@ -1044,10 +1314,12 @@ async function openStudentProfile(st) {
     }
   }
 
-  if (profAbsences) profAbsences.textContent = "...";
-  if (profScore) profScore.textContent = "...";
-  if (profDebt) profDebt.textContent = "...";
-  if (profHistoryList) profHistoryList.replaceChildren();
+  document.getElementById("profTotalAbsences").textContent = "...";
+  document.getElementById("profTotalLates").textContent = "...";
+  document.getElementById("profTotalScore").textContent = "...";
+  document.getElementById("profDailyScore").textContent = "...";
+  document.getElementById("profExamScore").textContent = "...";
+  document.getElementById("profTotalDebt").textContent = "...";
 
   modalStudentProfile?.classList.remove("hidden");
   updateBackButton();
@@ -1056,37 +1328,39 @@ async function openStudentProfile(st) {
 }
 
 async function reloadProfileData(studentId) {
-  const profAbsences = document.getElementById("profTotalAbsences");
-  const profScore = document.getElementById("profTotalScore");
-  const profDebt = document.getElementById("profTotalDebt");
-  const profHistoryList = document.getElementById("profHistoryList");
-  const profHistoryCount = document.getElementById("profHistoryCount");
+  const elAbsences = document.getElementById("profTotalAbsences");
+  const elLates = document.getElementById("profTotalLates");
+  const elTotalScore = document.getElementById("profTotalScore");
+  const elDailyScore = document.getElementById("profDailyScore");
+  const elExamScore = document.getElementById("profExamScore");
+  const elTotalDebt = document.getElementById("profTotalDebt");
+  const elHistoryList = document.getElementById("profHistoryList");
+  const elHistoryCount = document.getElementById("profHistoryCount");
+  const elAttHistoryList = document.getElementById("profAttHistoryList");
 
   try {
     const data = await apiRequest(`/api/students/${studentId}/profile`);
 
-    const totalAbsences = data.total_absences ?? data.stats?.total_absences ?? 0;
-    const totalScore = data.total_score ?? data.stats?.total_score ?? 0;
-    const totalDebt = data.total_debt ?? data.stats?.total_debt ?? 0;
+    if (elAbsences) elAbsences.textContent = `${data.total_absences ?? 0} ta`;
+    if (elLates) elLates.textContent = `${data.total_lates ?? 0} ta`;
+    if (elTotalScore) elTotalScore.textContent = `${data.total_score ?? 0} ball`;
+    if (elDailyScore) elDailyScore.textContent = `${data.daily_score ?? 0} ball`;
+    if (elExamScore) elExamScore.textContent = `${data.exam_score ?? 0} ball`;
+    if (elTotalDebt) elTotalDebt.textContent = `${Number(data.total_debt ?? 0).toLocaleString("uz-UZ")} so'm`;
+
     const history = data.history || [];
+    if (elHistoryCount) elHistoryCount.textContent = `${history.length} ta amal`;
 
-    if (profAbsences) profAbsences.textContent = `${totalAbsences} ta`;
-    if (profScore) profScore.textContent = `${totalScore} ball`;
-    if (profDebt) profDebt.textContent = `${Number(totalDebt).toLocaleString("uz-UZ")} so'm`;
-    if (profHistoryCount) profHistoryCount.textContent = `${history.length} ta amal`;
-
-    if (profHistoryList) {
-      profHistoryList.replaceChildren();
-
-      if (!history || history.length === 0) {
+    // Amallar tarixi
+    if (elHistoryList) {
+      elHistoryList.replaceChildren();
+      if (history.length === 0) {
         const emptyDiv = document.createElement("div");
-        emptyDiv.className = "empty-card";
-        emptyDiv.style.padding = "20px";
-        const emptyTitle = document.createElement("div");
-        emptyTitle.className = "empty-title";
-        emptyTitle.textContent = "Amallar tarixi mavjud emas";
-        emptyDiv.appendChild(emptyTitle);
-        profHistoryList.appendChild(emptyDiv);
+        emptyDiv.className = "empty-title";
+        emptyDiv.style.padding = "16px";
+        emptyDiv.style.textAlign = "center";
+        emptyDiv.textContent = "Amallar tarixi mavjud emas";
+        elHistoryList.appendChild(emptyDiv);
       } else {
         history.forEach((item) => {
           const row = document.createElement("div");
@@ -1124,12 +1398,53 @@ async function reloadProfileData(studentId) {
 
           row.appendChild(left);
           row.appendChild(amountDiv);
-          profHistoryList.appendChild(row);
+          elHistoryList.appendChild(row);
+        });
+      }
+    }
+
+    // Davomat tarixi
+    if (elAttHistoryList) {
+      elAttHistoryList.replaceChildren();
+      const attHistory = data.attendance_history || [];
+      if (attHistory.length === 0) {
+        const emptyDiv = document.createElement("div");
+        emptyDiv.className = "empty-title";
+        emptyDiv.style.padding = "16px";
+        emptyDiv.style.textAlign = "center";
+        emptyDiv.textContent = "Davomat yozuvlari mavjud emas";
+        elAttHistoryList.appendChild(emptyDiv);
+      } else {
+        attHistory.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "teacher-lesson-row";
+
+          const dateSpan = document.createElement("span");
+          dateSpan.className = "teacher-lesson-num";
+          dateSpan.textContent = `${formatDisplayDate(item.date)} (${item.lesson}-dars)`;
+
+          const statusSpan = document.createElement("span");
+          statusSpan.className = "teacher-lesson-topic";
+          if (item.status === "absent") {
+            statusSpan.style.color = "var(--primary-red)";
+            statusSpan.style.fontWeight = "700";
+            statusSpan.textContent = "Kelmadi";
+          } else if (item.status === "late") {
+            statusSpan.style.color = "#D97706";
+            statusSpan.style.fontWeight = "700";
+            statusSpan.textContent = formatLateMinutes(item.late_minutes);
+          } else {
+            statusSpan.textContent = "Kelgan";
+          }
+
+          row.appendChild(dateSpan);
+          row.appendChild(statusSpan);
+          elAttHistoryList.appendChild(row);
         });
       }
     }
   } catch (err) {
-    console.error("Profil ma'lumotlarini yuklashda xato:", err);
+    console.warn("Profil ma'lumotlarini yuklashda xato:", err);
   }
 }
 
@@ -1163,7 +1478,7 @@ document.getElementById("btnProfAddFine")?.addEventListener("click", async () =>
   }
 });
 
-// Qarz undirish (bottom sheet, summa input, confirm)
+// Qarz undirish
 document.getElementById("btnProfCollectDebt")?.addEventListener("click", () => {
   if (!selectedStudentForProfile) return;
   haptic.impact("light");
@@ -1219,7 +1534,7 @@ formCollectDebt?.addEventListener("submit", async (e) => {
   try {
     await apiRequest(`/api/students/${selectedStudentForProfile.id}/collect`, {
       method: "POST",
-      body: JSON.stringify({ amount: amount })
+      body: JSON.stringify({ amount })
     });
 
     haptic.notification("success");
@@ -1241,13 +1556,14 @@ document.getElementById("btnProfileEdit")?.addEventListener("click", () => {
   }
 });
 
+// O'quvchini butunlay o'chirish (Hard Delete + Cascade)
 document.getElementById("btnProfileDelete")?.addEventListener("click", async () => {
   if (!selectedStudentForProfile) return;
   haptic.impact("medium");
 
   const name = `${selectedStudentForProfile.first_name || ""} ${selectedStudentForProfile.last_name || ""}`.trim();
   const confirmed = await confirmAction(
-    `"${name}" o'quvchisini butunlay o'chirishni tasdiqlaysizmi?`,
+    `"${name}" o'quvchisi botdan va barcha ma'lumotlardan butunlay o'chadi. Qaytarib bo'lmaydi.`,
     "O'chirish"
   );
 
@@ -1255,10 +1571,11 @@ document.getElementById("btnProfileDelete")?.addEventListener("click", async () 
     try {
       await apiRequest(`/api/students/${selectedStudentForProfile.id}`, { method: "DELETE" });
       haptic.notification("success");
-      showToast("O'quvchi o'chirildi", "success");
+      showToast("O'quvchi muvaffaqiyatli o'chirildi", "success");
       modalStudentProfile?.classList.add("hidden");
       updateBackButton();
       loadStudents();
+      loadHomeDashboard();
     } catch (err) {}
   }
 });
@@ -1333,7 +1650,7 @@ formStudent?.addEventListener("submit", async (e) => {
 });
 
 // ====================================================
-// 3. DAVOMAT BO'LIMI: 2 TA DARS TABI, FAQAT BITTA "KELMADI"
+// 3. DAVOMAT BO'LIMI: KELDI / KELMADI / KECH QOLDI
 // ====================================================
 let currentAttDate = getTodayString();
 let currentAttLesson = 1; // 1 | 2
@@ -1341,12 +1658,20 @@ let currentAttCalYear = new Date().getFullYear();
 let currentAttCalMonth = new Date().getMonth();
 let attendanceMonthCache = {};
 
+let attStateMap = new Map(); // student_id => { status: "present"|"absent"|"late", late_minutes: number|null }
+let attStudentsList = [];
+let currentAttIsStarted = false;
+let currentAttTopic = "";
+
 const attendanceListEl = document.getElementById("attendanceList");
 const attendanceLoaderEl = document.getElementById("attendanceLoader");
 const attCalMonthTitleEl = document.getElementById("attCalMonthTitle");
 const attCalendarGridEl = document.getElementById("attCalendarGrid");
 const attSelectedDateTitleEl = document.getElementById("attSelectedDateTitle");
 const attSummaryStatEl = document.getElementById("attSummaryStat");
+const attLessonTopicText = document.getElementById("attLessonTopicText");
+const attTopicWarningBanner = document.getElementById("attTopicWarningBanner");
+const btnSaveAttendance = document.getElementById("btnSaveAttendance");
 
 document.getElementById("btnAttLesson1")?.addEventListener("click", () => {
   if (currentAttLesson === 1) return;
@@ -1447,9 +1772,6 @@ document.getElementById("btnAttCalNext")?.addEventListener("click", () => {
   renderAttendanceCalendar();
 });
 
-let attAbsenceSet = new Set();
-let attStudentsList = [];
-
 async function loadAttendance() {
   attendanceLoaderEl?.classList.remove("hidden");
   if (attSelectedDateTitleEl) {
@@ -1460,42 +1782,32 @@ async function loadAttendance() {
     const endpoint = `/api/attendance?date=${currentAttDate}&lesson=${currentAttLesson}`;
     const res = await apiRequest(endpoint);
 
-    attAbsenceSet.clear();
+    attStateMap.clear();
 
-    if (Array.isArray(res)) {
-      attStudentsList = res;
-      res.forEach((st) => {
-        if (st.is_absent || st.status === "absent") {
-          attAbsenceSet.add(st.student_id || st.id);
-        }
-      });
-    } else if (res && typeof res === "object") {
-      attStudentsList = res.students || [];
-      if (res.absent_student_ids && Array.isArray(res.absent_student_ids)) {
-        res.absent_student_ids.forEach((id) => attAbsenceSet.add(id));
-      } else if (res.absent_ids && Array.isArray(res.absent_ids)) {
-        res.absent_ids.forEach((id) => attAbsenceSet.add(id));
-      } else {
-        attStudentsList.forEach((st) => {
-          if (st.is_absent || st.status === "absent") {
-            attAbsenceSet.add(st.student_id || st.id);
-          }
-        });
-      }
+    currentAttIsStarted = Boolean(res?.is_started);
+    currentAttTopic = res?.topic || "";
+
+    if (currentAttIsStarted && currentAttTopic) {
+      attLessonTopicText.textContent = currentAttTopic;
+      attTopicWarningBanner.classList.add("hidden");
+    } else {
+      attLessonTopicText.textContent = "Mavzu kiritilmagan";
+      attTopicWarningBanner.classList.remove("hidden");
     }
 
-    if ((!attStudentsList || attStudentsList.length === 0) && allStudents.length > 0) {
-      attStudentsList = allStudents.map((s) => ({
-        student_id: s.id,
-        first_name: s.first_name,
-        last_name: s.last_name,
-        grade: s.grade
-      }));
+    if (res && res.students) {
+      attStudentsList = res.students;
+      res.students.forEach((st) => {
+        attStateMap.set(st.student_id, {
+          status: st.status || "present",
+          late_minutes: st.late_minutes || null
+        });
+      });
     }
 
     renderAttendanceList();
   } catch (e) {
-    console.error("Davomatni yuklashda xato:", e);
+    console.warn("Davomatni yuklashda xato:", e);
   } finally {
     attendanceLoaderEl?.classList.add("hidden");
     updateWindowStatusUI();
@@ -1506,40 +1818,42 @@ function renderAttendanceList() {
   attendanceListEl.replaceChildren();
 
   const total = attStudentsList ? attStudentsList.length : 0;
-  const absentCount = attAbsenceSet.size;
+  let absentCount = 0;
+
+  attStateMap.forEach((val) => {
+    if (val.status === "absent") absentCount++;
+  });
+
   const presentCount = Math.max(0, total - absentCount);
 
   if (attSummaryStatEl) {
     attSummaryStatEl.textContent = `Keldi: ${presentCount} / ${total}`;
   }
 
-  if (total > 0) {
-    attendanceMonthCache[currentAttDate] = {
-      has_absent: absentCount > 0,
-      is_saved: true
-    };
-    renderAttendanceCalendar();
+  const isToday = currentAttDate === getTodayString();
+  const isWindowOpen = isLessonWindowOpen(currentAttLesson) && isToday && !systemStatus.is_weekend;
+  const canEdit = isWindowOpen && currentAttIsStarted;
+
+  // Saqlash tugmasini holati
+  if (btnSaveAttendance) {
+    btnSaveAttendance.disabled = !canEdit;
+    if (!canEdit) {
+      btnSaveAttendance.classList.add("is-disabled-window");
+    } else {
+      btnSaveAttendance.classList.remove("is-disabled-window");
+    }
   }
 
   if (!attStudentsList || attStudentsList.length === 0) {
     const emptyCard = document.createElement("div");
     emptyCard.className = "card empty-card";
-
-    const emptyIcon = document.createElement("div");
-    emptyIcon.className = "empty-icon-wrap";
-    emptyIcon.appendChild(createSvgIcon("calendar", 24));
-
     const emptyTitle = document.createElement("div");
     emptyTitle.className = "empty-title";
     emptyTitle.textContent = "O'quvchilar topilmadi";
-
-    emptyCard.appendChild(emptyIcon);
     emptyCard.appendChild(emptyTitle);
     attendanceListEl.appendChild(emptyCard);
     return;
   }
-
-  const isWindowOpen = isLessonWindowOpen(currentAttLesson);
 
   attStudentsList.forEach((st) => {
     const sId = st.student_id || st.id;
@@ -1548,6 +1862,7 @@ function renderAttendanceList() {
 
     const cardLeft = document.createElement("div");
     cardLeft.className = "card-left";
+    cardLeft.style.cursor = "pointer";
 
     const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
 
@@ -1574,74 +1889,211 @@ function renderAttendanceList() {
     cardLeft.appendChild(avatar);
     cardLeft.appendChild(info);
 
-    // FAQAT bitta 'Kelmadi' tugmasi (bosilsa qizil, qayta bosilsa bekor)
+    cardLeft.onclick = () => {
+      haptic.impact("light");
+      openStudentProfile({
+        id: sId,
+        first_name: st.first_name,
+        last_name: st.last_name,
+        grade: st.grade
+      });
+    };
+
+    const actionsWrap = document.createElement("div");
+    actionsWrap.className = "att-actions-wrap";
+
+    const curState = attStateMap.get(sId) || { status: "present", late_minutes: null };
+
+    // Tugma 1: Kelmadi
     const btnAbsent = document.createElement("button");
     btnAbsent.type = "button";
-    btnAbsent.className = "btn-attendance-absent-toggle";
+    btnAbsent.className = "btn-att-absent";
     btnAbsent.textContent = "Kelmadi";
 
-    const isAbsent = attAbsenceSet.has(sId);
-    if (isAbsent) {
+    if (curState.status === "absent") {
       btnAbsent.classList.add("is-absent");
     }
 
-    // Yopiq dars oynasida qora tugmalar
-    if (!isWindowOpen) {
+    // Tugma 2: Kech qoldi
+    const btnLate = document.createElement("button");
+    btnLate.type = "button";
+    btnLate.className = "btn-att-late";
+
+    if (curState.status === "late" && curState.late_minutes) {
+      btnLate.className = "chip-late-badge is-late";
+      btnLate.textContent = formatLateMinutes(curState.late_minutes);
+    } else {
+      btnLate.textContent = "Kech qoldi";
+    }
+
+    if (!canEdit) {
       btnAbsent.disabled = true;
       btnAbsent.classList.add("is-disabled-window");
+      btnLate.disabled = true;
+      btnLate.classList.add("is-disabled-window");
     }
 
     btnAbsent.onclick = (e) => {
       e.stopPropagation();
-      if (!isLessonWindowOpen(currentAttLesson)) {
-        showToast("Dars oynasi yopiq, o'zgartirish taqiqlangan", "error");
+      if (!canEdit) {
+        showToast("Dars oynasi yopiq yoki mavzu kiritilmagan", "error");
         return;
       }
-
       haptic.impact("light");
 
-      if (attAbsenceSet.has(sId)) {
-        attAbsenceSet.delete(sId);
-        btnAbsent.classList.remove("is-absent");
+      if (curState.status === "absent") {
+        attStateMap.set(sId, { status: "present", late_minutes: null });
       } else {
-        attAbsenceSet.add(sId);
-        btnAbsent.classList.add("is-absent");
+        attStateMap.set(sId, { status: "absent", late_minutes: null });
       }
-
-      const curAbsentCount = attAbsenceSet.size;
-      const curPresentCount = Math.max(0, total - curAbsentCount);
-      if (attSummaryStatEl) {
-        attSummaryStatEl.textContent = `Keldi: ${curPresentCount} / ${total}`;
-      }
+      renderAttendanceList();
     };
 
+    btnLate.onclick = (e) => {
+      e.stopPropagation();
+      if (!canEdit) {
+        showToast("Dars oynasi yopiq yoki mavzu kiritilmagan", "error");
+        return;
+      }
+      haptic.impact("light");
+      openLateArrivalSheet(sId, curState);
+    };
+
+    actionsWrap.appendChild(btnAbsent);
+    actionsWrap.appendChild(btnLate);
+
     card.appendChild(cardLeft);
-    card.appendChild(btnAbsent);
+    card.appendChild(actionsWrap);
     attendanceListEl.appendChild(card);
   });
 }
 
+// Kech qoldi Bottom Sheet
+const sheetLateArrival = document.getElementById("sheetLateArrival");
+const formLateArrival = document.getElementById("formLateArrival");
+const lateStudentId = document.getElementById("lateStudentId");
+const lateAmountInput = document.getElementById("lateAmountInput");
+const btnUnitMinutes = document.getElementById("btnUnitMinutes");
+const btnUnitHours = document.getElementById("btnUnitHours");
+const btnLateCancel = document.getElementById("btnLateCancel");
+
+let lateCurrentUnit = "minute"; // minute | hour
+
+btnUnitMinutes?.addEventListener("click", () => {
+  haptic.selection();
+  lateCurrentUnit = "minute";
+  btnUnitMinutes.classList.add("active");
+  btnUnitHours.classList.remove("active");
+});
+
+btnUnitHours?.addEventListener("click", () => {
+  haptic.selection();
+  lateCurrentUnit = "hour";
+  btnUnitHours.classList.add("active");
+  btnUnitMinutes.classList.remove("active");
+});
+
+function openLateArrivalSheet(sId, curState) {
+  lateStudentId.value = String(sId);
+
+  if (curState.status === "late" && curState.late_minutes) {
+    if (curState.late_minutes >= 60 && curState.late_minutes % 60 === 0) {
+      lateAmountInput.value = String(curState.late_minutes / 60);
+      lateCurrentUnit = "hour";
+      btnUnitHours?.classList.add("active");
+      btnUnitMinutes?.classList.remove("active");
+    } else {
+      lateAmountInput.value = String(curState.late_minutes);
+      lateCurrentUnit = "minute";
+      btnUnitMinutes?.classList.add("active");
+      btnUnitHours?.classList.remove("active");
+    }
+  } else {
+    lateAmountInput.value = "15";
+    lateCurrentUnit = "minute";
+    btnUnitMinutes?.classList.add("active");
+    btnUnitHours?.classList.remove("active");
+  }
+
+  sheetLateArrival?.classList.remove("hidden");
+  updateBackButton();
+}
+
+btnLateCancel?.addEventListener("click", () => {
+  haptic.impact("light");
+  const sId = parseInt(lateStudentId.value, 10);
+  if (sId) {
+    attStateMap.set(sId, { status: "present", late_minutes: null });
+  }
+  sheetLateArrival?.classList.add("hidden");
+  updateBackButton();
+  renderAttendanceList();
+});
+
+formLateArrival?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  haptic.impact("medium");
+
+  const sId = parseInt(lateStudentId.value, 10);
+  let amount = parseInt(lateAmountInput.value.trim(), 10);
+
+  if (isNaN(amount) || amount <= 0) {
+    showToast("Miqdor musbat butun son bo'lishi kerak", "error");
+    return;
+  }
+
+  let totalMinutes = amount;
+  if (lateCurrentUnit === "hour") {
+    totalMinutes = amount * 60;
+  }
+
+  if (totalMinutes < 1 || totalMinutes > 600) {
+    showToast("Kech qolish 1 dan 600 daqiqagacha bo'lishi kerak", "error");
+    return;
+  }
+
+  attStateMap.set(sId, { status: "late", late_minutes: totalMinutes });
+  sheetLateArrival?.classList.add("hidden");
+  updateBackButton();
+  renderAttendanceList();
+});
+
 // Davomat: Katta qizil Saqlash tugmasi
-document.getElementById("btnSaveAttendance")?.addEventListener("click", async () => {
-  if (!isLessonWindowOpen(currentAttLesson)) {
-    showToast("Dars oynasi yopiq, saqlash taqiqlangan", "error");
+btnSaveAttendance?.addEventListener("click", async () => {
+  const isToday = currentAttDate === getTodayString();
+  const isWindowOpen = isLessonWindowOpen(currentAttLesson) && isToday && !systemStatus.is_weekend;
+
+  if (!isWindowOpen || !currentAttIsStarted) {
+    showToast("Dars oynasi yopiq yoki mavzu kiritilmagan", "error");
     return;
   }
 
   haptic.impact("medium");
-  const btnSave = document.getElementById("btnSaveAttendance");
   const btnText = document.getElementById("btnSaveAttendanceText");
   const origText = btnText ? btnText.textContent : "Saqlash";
 
-  if (btnSave) btnSave.disabled = true;
+  btnSaveAttendance.disabled = true;
   if (btnText) btnText.textContent = "Saqlanmoqda...";
 
-  const absentList = Array.from(attAbsenceSet);
+  const absent_ids = [];
+  const late = [];
+
+  attStateMap.forEach((val, studentId) => {
+    if (val.status === "absent") {
+      absent_ids.push(studentId);
+    } else if (val.status === "late" && val.late_minutes) {
+      late.push({
+        student_id: studentId,
+        minutes: val.late_minutes
+      });
+    }
+  });
+
   const payload = {
     date: currentAttDate,
     lesson: currentAttLesson,
-    absences: absentList,
-    absent_student_ids: absentList
+    absent_ids,
+    late
   };
 
   try {
@@ -1655,27 +2107,41 @@ document.getElementById("btnSaveAttendance")?.addEventListener("click", async ()
     await loadAttendance();
   } catch (err) {
   } finally {
-    if (btnSave) btnSave.disabled = !isLessonWindowOpen(currentAttLesson);
+    btnSaveAttendance.disabled = false;
     if (btnText) btnText.textContent = origText;
   }
 });
 
 // ====================================================
-// 4. BAHOLASH BO'LIMI: 1-5 VA KATTA QIZIL SAQLASH
+// 4. BAHOLASH BO'LIMI: DARS BAHOSI VA IMTIHON (+, −)
 // ====================================================
 let currentGradeDate = getTodayString();
 let currentGradeLesson = 1; // 1 | 2
 let currentGradeKind = "daily"; // daily | exam
 let currentGradeCalYear = new Date().getFullYear();
 let currentGradeCalMonth = new Date().getMonth();
-let gradesMonthCache = {};
 
+let dailyGradesMap = new Map(); // student_id => value (1-5)
+let dailyStudentsList = [];
+let currentGradeIsStarted = false;
+let currentGradeTopic = "";
+
+let todayExamsList = [];
+let selectedExam = null;
+let examGradesMap = new Map(); // student_id => { value: number|null, modifier: 'plus'|'minus'|null }
+
+const gradesDailyContainer = document.getElementById("gradesDailyContainer");
+const gradesExamContainer = document.getElementById("gradesExamContainer");
 const gradesListEl = document.getElementById("gradesList");
+const examsListEl = document.getElementById("examsList");
 const gradesLoaderEl = document.getElementById("gradesLoader");
 const gradeCalMonthTitleEl = document.getElementById("gradeCalMonthTitle");
 const gradeCalendarGridEl = document.getElementById("gradeCalendarGrid");
 const gradeSelectedDateTitleEl = document.getElementById("gradeSelectedDateTitle");
 const gradeSummaryStatEl = document.getElementById("gradeSummaryStat");
+const gradeLessonTopicText = document.getElementById("gradeLessonTopicText");
+const gradeTopicWarningBanner = document.getElementById("gradeTopicWarningBanner");
+const btnSaveGrades = document.getElementById("btnSaveGrades");
 
 document.getElementById("btnGradeLesson1")?.addEventListener("click", () => {
   if (currentGradeLesson === 1) return;
@@ -1703,6 +2169,8 @@ document.getElementById("btnGradeKindDaily")?.addEventListener("click", () => {
   currentGradeKind = "daily";
   document.getElementById("btnGradeKindDaily")?.classList.add("active");
   document.getElementById("btnGradeKindExam")?.classList.remove("active");
+  gradesDailyContainer?.classList.remove("hidden");
+  gradesExamContainer?.classList.add("hidden");
   loadGrades();
 });
 
@@ -1712,7 +2180,10 @@ document.getElementById("btnGradeKindExam")?.addEventListener("click", () => {
   currentGradeKind = "exam";
   document.getElementById("btnGradeKindExam")?.classList.add("active");
   document.getElementById("btnGradeKindDaily")?.classList.remove("active");
-  loadGrades();
+  gradesDailyContainer?.classList.add("hidden");
+  gradesExamContainer?.classList.remove("hidden");
+  selectedExam = null;
+  loadExamsList();
 });
 
 function renderGradesCalendar() {
@@ -1751,17 +2222,16 @@ function renderGradesCalendar() {
       dayEl.classList.add("selected");
     }
 
-    if (gradesMonthCache[fullDate]) {
-      const dot = document.createElement("span");
-      dot.className = "cal-day-dot dot-green";
-      dayEl.appendChild(dot);
-    }
-
     dayEl.onclick = () => {
       haptic.selection();
       currentGradeDate = fullDate;
       renderGradesCalendar();
-      loadGrades();
+      if (currentGradeKind === "daily") {
+        loadGrades();
+      } else {
+        selectedExam = null;
+        loadExamsList();
+      }
     };
 
     gradeCalendarGridEl.appendChild(dayEl);
@@ -1788,9 +2258,7 @@ document.getElementById("btnGradeCalNext")?.addEventListener("click", () => {
   renderGradesCalendar();
 });
 
-let gradesMap = new Map();
-let gradeStudentsList = [];
-
+// Dars baholarini yuklash
 async function loadGrades() {
   gradesLoaderEl?.classList.remove("hidden");
   if (gradeSelectedDateTitleEl) {
@@ -1798,62 +2266,62 @@ async function loadGrades() {
   }
 
   try {
-    const endpoint = `/api/grades?date=${currentGradeDate}&lesson=${currentGradeLesson}&kind=${currentGradeKind}`;
+    const endpoint = `/api/grades?date=${currentGradeDate}&lesson=${currentGradeLesson}&kind=daily`;
     const res = await apiRequest(endpoint);
 
-    gradesMap.clear();
+    dailyGradesMap.clear();
 
-    if (Array.isArray(res)) {
-      gradeStudentsList = res;
-      res.forEach((g) => {
-        if (g.value !== undefined && g.value !== null) {
-          gradesMap.set(g.student_id, g.value);
-        }
-      });
-    } else if (res && typeof res === "object") {
-      gradeStudentsList = res.items || res.grades || [];
-      const list = res.items || res.grades || [];
-      list.forEach((g) => {
-        if (g.value !== undefined && g.value !== null) {
-          gradesMap.set(g.student_id, g.value);
-        }
-      });
+    currentGradeIsStarted = Boolean(res?.is_started);
+    currentGradeTopic = res?.topic || "";
+
+    if (currentGradeIsStarted && currentGradeTopic) {
+      gradeLessonTopicText.textContent = currentGradeTopic;
+      gradeTopicWarningBanner.classList.add("hidden");
+    } else {
+      gradeLessonTopicText.textContent = "Mavzu kiritilmagan";
+      gradeTopicWarningBanner.classList.remove("hidden");
     }
 
-    if ((!gradeStudentsList || gradeStudentsList.length === 0) && allStudents.length > 0) {
-      gradeStudentsList = allStudents.map((s) => ({
-        student_id: s.id,
-        first_name: s.first_name,
-        last_name: s.last_name,
-        grade: s.grade
-      }));
-    }
+    dailyStudentsList = res?.items || [];
+    dailyStudentsList.forEach((st) => {
+      if (st.value !== null && st.value !== undefined) {
+        dailyGradesMap.set(st.student_id, st.value);
+      }
+    });
 
-    renderGradesList();
+    renderDailyGradesList();
   } catch (e) {
-    console.error("Baholarni yuklashda xato:", e);
+    console.warn("Baholarni yuklashda xato:", e);
   } finally {
     gradesLoaderEl?.classList.add("hidden");
     updateWindowStatusUI();
   }
 }
 
-function renderGradesList() {
+function renderDailyGradesList() {
   gradesListEl.replaceChildren();
 
-  const total = gradeStudentsList ? gradeStudentsList.length : 0;
-  const gradedCount = gradesMap.size;
+  const total = dailyStudentsList ? dailyStudentsList.length : 0;
+  const gradedCount = dailyGradesMap.size;
 
   if (gradeSummaryStatEl) {
     gradeSummaryStatEl.textContent = `Baholangan: ${gradedCount} / ${total}`;
   }
 
-  if (gradedCount > 0) {
-    gradesMonthCache[currentGradeDate] = true;
-    renderGradesCalendar();
+  const isToday = currentGradeDate === getTodayString();
+  const isWindowOpen = isLessonWindowOpen(currentGradeLesson) && isToday && !systemStatus.is_weekend;
+  const canEdit = isWindowOpen && currentGradeIsStarted;
+
+  if (btnSaveGrades) {
+    btnSaveGrades.disabled = !canEdit;
+    if (!canEdit) {
+      btnSaveGrades.classList.add("is-disabled-window");
+    } else {
+      btnSaveGrades.classList.remove("is-disabled-window");
+    }
   }
 
-  if (!gradeStudentsList || gradeStudentsList.length === 0) {
+  if (!dailyStudentsList || dailyStudentsList.length === 0) {
     const emptyCard = document.createElement("div");
     emptyCard.className = "card empty-card";
     const emptyTitle = document.createElement("div");
@@ -1864,15 +2332,14 @@ function renderGradesList() {
     return;
   }
 
-  const isWindowOpen = isLessonWindowOpen(currentGradeLesson);
-
-  gradeStudentsList.forEach((st) => {
-    const sId = st.student_id || st.id;
+  dailyStudentsList.forEach((st) => {
+    const sId = st.student_id;
     const card = document.createElement("div");
     card.className = "card student-row-card";
 
     const cardLeft = document.createElement("div");
     cardLeft.className = "card-left";
+    cardLeft.style.cursor = "pointer";
 
     const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
 
@@ -1899,144 +2366,720 @@ function renderGradesList() {
     cardLeft.appendChild(avatar);
     cardLeft.appendChild(info);
 
-    const gradesGroup = document.createElement("div");
-    gradesGroup.className = "grades-button-group";
+    cardLeft.onclick = () => {
+      haptic.impact("light");
+      openStudentProfile({
+        id: sId,
+        first_name: st.first_name,
+        last_name: st.last_name,
+        grade: st.grade
+      });
+    };
 
-    const currentVal = gradesMap.get(sId);
+    const curVal = dailyGradesMap.get(sId);
+    const chip = document.createElement("div");
+    chip.className = `chip-grade-badge ${curVal ? "" : "empty"}`;
+    chip.textContent = curVal ? String(curVal) : "-";
 
-    [1, 2, 3, 4, 5].forEach((val) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "grade-btn-val";
-      btn.textContent = String(val);
-
-      if (val === 5) btn.classList.add("val-5");
-      if (currentVal === val) btn.classList.add("active");
-
-      // Yopiq dars oynasida qora tugmalar
-      if (!isWindowOpen) {
-        btn.disabled = true;
-        btn.classList.add("is-disabled-window");
+    chip.onclick = () => {
+      if (!canEdit) {
+        showToast("Dars oynasi yopiq yoki mavzu kiritilmagan", "error");
+        return;
       }
-
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        if (!isLessonWindowOpen(currentGradeLesson)) {
-          showToast("Dars oynasi yopiq, baholash taqiqlangan", "error");
-          return;
-        }
-
-        haptic.impact("light");
-
-        if (gradesMap.get(sId) === val) {
-          gradesMap.delete(sId);
-        } else {
-          gradesMap.set(sId, val);
-        }
-
-        renderGradesList();
-      };
-
-      gradesGroup.appendChild(btn);
-    });
+      haptic.impact("light");
+      openDailyGradePickerSheet(sId, studentFullName, curVal);
+    };
 
     card.appendChild(cardLeft);
-    card.appendChild(gradesGroup);
+    card.appendChild(chip);
     gradesListEl.appendChild(card);
   });
 }
 
-// Baholar: Katta qizil Saqlash tugmasi
-document.getElementById("btnSaveGrades")?.addEventListener("click", async () => {
-  if (!isLessonWindowOpen(currentGradeLesson)) {
+// Kundalik baho sheet
+const sheetDailyGradePicker = document.getElementById("sheetDailyGradePicker");
+const sheetDailyGradeStudentName = document.getElementById("sheetDailyGradeStudentName");
+const btnClearDailyGrade = document.getElementById("btnClearDailyGrade");
+let selectedStudentForDailyGrade = null;
+
+function openDailyGradePickerSheet(studentId, studentName, curVal) {
+  selectedStudentForDailyGrade = studentId;
+  sheetDailyGradeStudentName.textContent = studentName;
+
+  document.querySelectorAll(".grade-circle-btn[data-val]").forEach((btn) => {
+    const val = parseInt(btn.getAttribute("data-val"), 10);
+    if (val === curVal) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  sheetDailyGradePicker?.classList.remove("hidden");
+  updateBackButton();
+}
+
+document.querySelectorAll(".grade-circle-btn[data-val]").forEach((btn) => {
+  btn.onclick = () => {
+    haptic.selection();
+    const val = parseInt(btn.getAttribute("data-val"), 10);
+    if (selectedStudentForDailyGrade) {
+      dailyGradesMap.set(selectedStudentForDailyGrade, val);
+    }
+    sheetDailyGradePicker?.classList.add("hidden");
+    updateBackButton();
+    renderDailyGradesList();
+  };
+});
+
+btnClearDailyGrade?.addEventListener("click", () => {
+  haptic.impact("light");
+  if (selectedStudentForDailyGrade) {
+    dailyGradesMap.delete(selectedStudentForDailyGrade);
+  }
+  sheetDailyGradePicker?.classList.add("hidden");
+  updateBackButton();
+  renderDailyGradesList();
+});
+
+// Imtihonlar ro'yxati va imtihon baholash
+async function loadExamsList() {
+  gradesLoaderEl?.classList.remove("hidden");
+  if (gradeSelectedDateTitleEl) {
+    gradeSelectedDateTitleEl.textContent = formatDisplayDate(currentGradeDate);
+  }
+
+  try {
+    const exams = await apiRequest(`/api/exams?date=${currentGradeDate}`);
+    todayExamsList = exams || [];
+    renderExamsUI();
+  } catch (e) {
+    console.warn("Imtihonlarni yuklashda xato:", e);
+  } finally {
+    gradesLoaderEl?.classList.add("hidden");
+    updateWindowStatusUI();
+  }
+}
+
+function renderExamsUI() {
+  examsListEl.replaceChildren();
+
+  // Agar imtihon tanlanmagan bo'lsa: imtihonlar ro'yxati
+  if (!selectedExam) {
+    if (gradeSummaryStatEl) {
+      gradeSummaryStatEl.textContent = `Imtihonlar: ${todayExamsList.length} ta`;
+    }
+
+    if (btnSaveGrades) {
+      btnSaveGrades.disabled = true;
+      btnSaveGrades.classList.add("is-disabled-window");
+    }
+
+    if (todayExamsList.length === 0) {
+      const emptyCard = document.createElement("div");
+      emptyCard.className = "card empty-card";
+      const emptyTitle = document.createElement("div");
+      emptyTitle.className = "empty-title";
+      emptyTitle.textContent = "Ushbu kunda imtihon ochilmagan";
+      emptyCard.appendChild(emptyTitle);
+      examsListEl.appendChild(emptyCard);
+      return;
+    }
+
+    todayExamsList.forEach((exam) => {
+      const card = document.createElement("div");
+      card.className = "card teacher-exam-card";
+
+      const topRow = document.createElement("div");
+      topRow.className = "lesson-card-top";
+
+      const title = document.createElement("div");
+      title.className = "teacher-exam-title";
+      title.textContent = exam.name;
+
+      const badge = document.createElement("span");
+      badge.className = "lesson-card-badge";
+      badge.textContent = `${exam.lesson_no}-dars`;
+
+      topRow.appendChild(title);
+      topRow.appendChild(badge);
+
+      const sub = document.createElement("div");
+      sub.className = "teacher-exam-sub";
+      sub.textContent = exam.topic;
+
+      card.appendChild(topRow);
+      card.appendChild(sub);
+
+      card.onclick = async () => {
+        haptic.impact("light");
+        selectedExam = exam;
+        await loadExamGrades(exam.id);
+      };
+
+      examsListEl.appendChild(card);
+    });
+  } else {
+    // Tanlangan imtihon bo'yicha o'quvchilar ro'yxati
+    renderSelectedExamGrades();
+  }
+}
+
+async function loadExamGrades(examId) {
+  gradesLoaderEl?.classList.remove("hidden");
+  try {
+    const grades = await apiRequest(`/api/exams/${examId}/grades`);
+    examGradesMap.clear();
+
+    if (grades && Array.isArray(grades)) {
+      grades.forEach((g) => {
+        examGradesMap.set(g.student_id, {
+          name: g.student_name,
+          value: g.value,
+          modifier: g.modifier
+        });
+      });
+    }
+
+    renderSelectedExamGrades();
+  } catch (err) {
+  } finally {
+    gradesLoaderEl?.classList.add("hidden");
+  }
+}
+
+function renderSelectedExamGrades() {
+  examsListEl.replaceChildren();
+
+  // Imtihon headeri va Orqaga tugmasi
+  const headerCard = document.createElement("div");
+  headerCard.className = "card teacher-exam-card";
+  headerCard.style.marginBottom = "12px";
+
+  const topRow = document.createElement("div");
+  topRow.className = "lesson-card-top";
+
+  const title = document.createElement("div");
+  title.className = "teacher-exam-title";
+  title.textContent = selectedExam.name;
+
+  const btnBack = document.createElement("button");
+  btnBack.className = "btn btn-secondary";
+  btnBack.style.padding = "4px 10px";
+  btnBack.style.fontSize = "12px";
+  btnBack.textContent = "Orqaga";
+  btnBack.onclick = () => {
+    haptic.impact("light");
+    selectedExam = null;
+    renderExamsUI();
+  };
+
+  topRow.appendChild(title);
+  topRow.appendChild(btnBack);
+
+  const sub = document.createElement("div");
+  sub.className = "teacher-exam-sub";
+  sub.textContent = `${selectedExam.lesson_no}-dars | ${selectedExam.topic}`;
+
+  headerCard.appendChild(topRow);
+  headerCard.appendChild(sub);
+  examsListEl.appendChild(headerCard);
+
+  const isToday = currentGradeDate === getTodayString();
+  const isWindowOpen = isLessonWindowOpen(selectedExam.lesson_no) && isToday && !systemStatus.is_weekend;
+
+  let gradedCount = 0;
+  examGradesMap.forEach((g) => {
+    if (g.value) gradedCount++;
+  });
+
+  if (gradeSummaryStatEl) {
+    gradeSummaryStatEl.textContent = `Baholangan: ${gradedCount} / ${examGradesMap.size}`;
+  }
+
+  if (btnSaveGrades) {
+    btnSaveGrades.disabled = !isWindowOpen;
+    if (!isWindowOpen) {
+      btnSaveGrades.classList.add("is-disabled-window");
+    } else {
+      btnSaveGrades.classList.remove("is-disabled-window");
+    }
+  }
+
+  examGradesMap.forEach((gradeData, studentId) => {
+    const card = document.createElement("div");
+    card.className = "card student-row-card";
+
+    const cardLeft = document.createElement("div");
+    cardLeft.className = "card-left";
+    cardLeft.style.cursor = "pointer";
+
+    const studentFullName = gradeData.name || "O'quvchi";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.style.background = getAvatarColor(studentFullName);
+    avatar.textContent = getInitials(studentFullName, "");
+
+    const info = document.createElement("div");
+    info.className = "card-info";
+
+    const titleDiv = document.createElement("div");
+    titleDiv.className = "card-title";
+    titleDiv.textContent = studentFullName;
+    info.appendChild(titleDiv);
+
+    cardLeft.appendChild(avatar);
+    cardLeft.appendChild(info);
+
+    cardLeft.onclick = () => {
+      haptic.impact("light");
+      openStudentProfile({ id: studentId, first_name: studentFullName });
+    };
+
+    const chip = document.createElement("div");
+    chip.className = `chip-grade-badge ${gradeData.value ? "" : "empty"}`;
+
+    if (gradeData.value) {
+      const modStr = gradeData.modifier === "plus" ? "+" : (gradeData.modifier === "minus" ? "−" : "");
+      chip.textContent = `${gradeData.value}${modStr}`;
+      const subLabel = document.createElement("span");
+      subLabel.className = "chip-grade-sub";
+      subLabel.textContent = "Imtihon";
+      chip.appendChild(subLabel);
+    } else {
+      chip.textContent = "-";
+    }
+
+    chip.onclick = () => {
+      if (!isWindowOpen) {
+        showToast("Dars oynasi yopiq, baholash taqiqlangan", "error");
+        return;
+      }
+      haptic.impact("light");
+      openExamGradePickerSheet(studentId, studentFullName, gradeData.value, gradeData.modifier);
+    };
+
+    card.appendChild(cardLeft);
+    card.appendChild(chip);
+    examsListEl.appendChild(card);
+  });
+}
+
+// Imtihon bahosi va modifikator sheet
+const sheetExamGradePicker = document.getElementById("sheetExamGradePicker");
+const sheetExamGradeStudentName = document.getElementById("sheetExamGradeStudentName");
+const btnModMinus = document.getElementById("btnModMinus");
+const btnModNone = document.getElementById("btnModNone");
+const btnModPlus = document.getElementById("btnModPlus");
+const btnClearExamGrade = document.getElementById("btnClearExamGrade");
+
+let examPickerStudentId = null;
+let examPickerSelectedVal = null;
+let examPickerSelectedMod = null;
+
+function openExamGradePickerSheet(studentId, studentName, curVal, curMod) {
+  examPickerStudentId = studentId;
+  examPickerSelectedVal = curVal || null;
+  examPickerSelectedMod = curMod || null;
+
+  sheetExamGradeStudentName.textContent = studentName;
+  updateExamPickerButtons();
+
+  sheetExamGradePicker?.classList.remove("hidden");
+  updateBackButton();
+}
+
+function updateExamPickerButtons() {
+  // 1-5 baho tugmalari
+  document.querySelectorAll(".grade-circle-btn[data-exam-val]").forEach((btn) => {
+    const val = parseInt(btn.getAttribute("data-exam-val"), 10);
+    if (val === examPickerSelectedVal) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  // Modifikator tugmalari: baho yo'q bo'lsa disabled!
+  const hasVal = examPickerSelectedVal !== null;
+  btnModMinus.disabled = !hasVal;
+  btnModNone.disabled = !hasVal;
+  btnModPlus.disabled = !hasVal;
+
+  btnModMinus.classList.remove("active");
+  btnModNone.classList.remove("active");
+  btnModPlus.classList.remove("active");
+
+  if (hasVal) {
+    if (examPickerSelectedMod === "minus") btnModMinus.classList.add("active");
+    else if (examPickerSelectedMod === "plus") btnModPlus.classList.add("active");
+    else btnModNone.classList.add("active");
+  }
+}
+
+document.querySelectorAll(".grade-circle-btn[data-exam-val]").forEach((btn) => {
+  btn.onclick = () => {
+    haptic.selection();
+    const val = parseInt(btn.getAttribute("data-exam-val"), 10);
+    examPickerSelectedVal = val;
+    updateExamPickerButtons();
+
+    // Baho o'zgarganda xotirani yangilash
+    if (examPickerStudentId && selectedExam) {
+      const cur = examGradesMap.get(examPickerStudentId) || {};
+      examGradesMap.set(examPickerStudentId, {
+        ...cur,
+        value: examPickerSelectedVal,
+        modifier: examPickerSelectedMod
+      });
+      renderSelectedExamGrades();
+    }
+  };
+});
+
+btnModMinus?.addEventListener("click", () => {
+  if (!examPickerSelectedVal) return;
+  haptic.selection();
+  examPickerSelectedMod = "minus";
+  updateExamPickerButtons();
+  if (examPickerStudentId && selectedExam) {
+    const cur = examGradesMap.get(examPickerStudentId) || {};
+    examGradesMap.set(examPickerStudentId, {
+      ...cur,
+      value: examPickerSelectedVal,
+      modifier: examPickerSelectedMod
+    });
+    renderSelectedExamGrades();
+  }
+});
+
+btnModNone?.addEventListener("click", () => {
+  if (!examPickerSelectedVal) return;
+  haptic.selection();
+  examPickerSelectedMod = null;
+  updateExamPickerButtons();
+  if (examPickerStudentId && selectedExam) {
+    const cur = examGradesMap.get(examPickerStudentId) || {};
+    examGradesMap.set(examPickerStudentId, {
+      ...cur,
+      value: examPickerSelectedVal,
+      modifier: null
+    });
+    renderSelectedExamGrades();
+  }
+});
+
+btnModPlus?.addEventListener("click", () => {
+  if (!examPickerSelectedVal) return;
+  haptic.selection();
+  examPickerSelectedMod = "plus";
+  updateExamPickerButtons();
+  if (examPickerStudentId && selectedExam) {
+    const cur = examGradesMap.get(examPickerStudentId) || {};
+    examGradesMap.set(examPickerStudentId, {
+      ...cur,
+      value: examPickerSelectedVal,
+      modifier: examPickerSelectedMod
+    });
+    renderSelectedExamGrades();
+  }
+});
+
+btnClearExamGrade?.addEventListener("click", () => {
+  haptic.impact("light");
+  if (examPickerStudentId && selectedExam) {
+    const cur = examGradesMap.get(examPickerStudentId) || {};
+    examGradesMap.set(examPickerStudentId, {
+      ...cur,
+      value: null,
+      modifier: null
+    });
+    renderSelectedExamGrades();
+  }
+  sheetExamGradePicker?.classList.add("hidden");
+  updateBackButton();
+});
+
+// Baholar Saqlash Tugmasi (Dars bahosi yoki Imtihon)
+btnSaveGrades?.addEventListener("click", async () => {
+  const isToday = currentGradeDate === getTodayString();
+  const isWindowOpen = isLessonWindowOpen(currentGradeKind === "daily" ? currentGradeLesson : selectedExam?.lesson_no) && isToday && !systemStatus.is_weekend;
+
+  if (!isWindowOpen) {
     showToast("Dars oynasi yopiq, saqlash taqiqlangan", "error");
     return;
   }
 
   haptic.impact("medium");
-  const btnSave = document.getElementById("btnSaveGrades");
   const btnText = document.getElementById("btnSaveGradesText");
   const origText = btnText ? btnText.textContent : "Saqlash";
 
-  if (btnSave) btnSave.disabled = true;
+  btnSaveGrades.disabled = true;
   if (btnText) btnText.textContent = "Saqlanmoqda...";
 
-  const gradesListPayload = Array.from(gradesMap.entries()).map(([student_id, value]) => ({
-    student_id,
-    value
-  }));
-
-  const payload = {
-    date: currentGradeDate,
-    lesson: currentGradeLesson,
-    kind: currentGradeKind,
-    grades: gradesListPayload
-  };
-
   try {
-    await apiRequest("/api/grades", {
-      method: "PUT",
-      body: JSON.stringify(payload)
-    });
+    if (currentGradeKind === "daily") {
+      const items = [];
+      dailyGradesMap.forEach((val, studentId) => {
+        items.push({ student_id: studentId, value: val });
+      });
 
-    haptic.notification("success");
-    showToast("Baholar muvaffaqiyatli saqlandi", "success");
-    await loadGrades();
+      await apiRequest("/api/grades", {
+        method: "PUT",
+        body: JSON.stringify({
+          date: currentGradeDate,
+          lesson: currentGradeLesson,
+          kind: "daily",
+          items
+        })
+      });
+
+      haptic.notification("success");
+      showToast("Dars baholari muvaffaqiyatli saqlandi", "success");
+      await loadGrades();
+    } else if (currentGradeKind === "exam" && selectedExam) {
+      const items = [];
+      examGradesMap.forEach((g, studentId) => {
+        if (g.value) {
+          items.push({
+            student_id: studentId,
+            value: g.value,
+            modifier: g.modifier || null
+          });
+        }
+      });
+
+      await apiRequest(`/api/exams/${selectedExam.id}/grades`, {
+        method: "PUT",
+        body: JSON.stringify({ items })
+      });
+
+      haptic.notification("success");
+      showToast("Imtihon baholari muvaffaqiyatli saqlandi", "success");
+      await loadExamGrades(selectedExam.id);
+    }
   } catch (err) {
   } finally {
-    if (btnSave) btnSave.disabled = !isLessonWindowOpen(currentGradeLesson);
+    btnSaveGrades.disabled = false;
     if (btnText) btnText.textContent = origText;
   }
 });
 
 // ====================================================
-// 5. SOZLAMALAR BO'LIMI (PAROL ALMASHTIRISH VA MANBALAR)
+// 5. O'QITUVCHI PROFILI (Teacher Profile Modal)
 // ====================================================
-document.querySelectorAll(".pwd-toggle-btn").forEach((btn) => {
-  btn.onclick = () => {
-    haptic.impact("light");
-    const targetId = btn.getAttribute("data-target");
-    const input = document.getElementById(targetId);
-    const eyeOpen = btn.querySelector(".eye-open");
-    const eyeClosed = btn.querySelector(".eye-closed");
+const modalTeacherProfile = document.getElementById("modalTeacherProfile");
+const btnTeacherProfile = document.getElementById("btnTeacherProfile");
+const btnCloseTeacherProfile = document.getElementById("btnCloseTeacherProfile");
+const teacherTotalLessons = document.getElementById("teacherTotalLessons");
+const teacherTotalExams = document.getElementById("teacherTotalExams");
+const teacherMonthTitle = document.getElementById("teacherMonthTitle");
+const teacherLessonsList = document.getElementById("teacherLessonsList");
+const teacherExamsList = document.getElementById("teacherExamsList");
+const btnTeacherTabLessons = document.getElementById("btnTeacherTabLessons");
+const btnTeacherTabExams = document.getElementById("btnTeacherTabExams");
 
-    if (!input) return;
+let teacherCalYear = new Date().getFullYear();
+let teacherCalMonth = new Date().getMonth();
+let teacherCurrentTab = "lessons"; // lessons | exams
 
-    if (input.type === "password") {
-      input.type = "text";
-      eyeOpen?.classList.add("hidden");
-      eyeClosed?.classList.remove("hidden");
-    } else {
-      input.type = "password";
-      eyeOpen?.classList.remove("hidden");
-      eyeClosed?.classList.add("hidden");
-    }
-  };
+btnTeacherProfile?.addEventListener("click", () => {
+  haptic.impact("light");
+  openTeacherProfile();
 });
 
+btnCloseTeacherProfile?.addEventListener("click", () => {
+  haptic.impact("light");
+  modalTeacherProfile?.classList.add("hidden");
+  updateBackButton();
+});
+
+btnTeacherTabLessons?.addEventListener("click", () => {
+  if (teacherCurrentTab === "lessons") return;
+  haptic.selection();
+  teacherCurrentTab = "lessons";
+  btnTeacherTabLessons.classList.add("active");
+  btnTeacherTabExams.classList.remove("active");
+  teacherLessonsList.classList.remove("hidden");
+  teacherExamsList.classList.add("hidden");
+});
+
+btnTeacherTabExams?.addEventListener("click", () => {
+  if (teacherCurrentTab === "exams") return;
+  haptic.selection();
+  teacherCurrentTab = "exams";
+  btnTeacherTabExams.classList.add("active");
+  btnTeacherTabLessons.classList.remove("active");
+  teacherExamsList.classList.remove("hidden");
+  teacherLessonsList.classList.add("hidden");
+});
+
+document.getElementById("btnTeacherMonthPrev")?.addEventListener("click", () => {
+  haptic.impact("light");
+  teacherCalMonth--;
+  if (teacherCalMonth < 0) {
+    teacherCalMonth = 11;
+    teacherCalYear--;
+  }
+  loadTeacherProfileData();
+});
+
+document.getElementById("btnTeacherMonthNext")?.addEventListener("click", () => {
+  haptic.impact("light");
+  teacherCalMonth++;
+  if (teacherCalMonth > 11) {
+    teacherCalMonth = 0;
+    teacherCalYear++;
+  }
+  loadTeacherProfileData();
+});
+
+function openTeacherProfile() {
+  modalTeacherProfile?.classList.remove("hidden");
+  updateBackButton();
+  loadTeacherProfileData();
+}
+
+async function loadTeacherProfileData() {
+  const mStr = String(teacherCalMonth + 1).padStart(2, "0");
+  const monthQuery = `${teacherCalYear}-${mStr}`;
+  teacherMonthTitle.textContent = `${MONTH_NAMES_UZ[teacherCalMonth]} ${teacherCalYear}`;
+
+  try {
+    const data = await apiRequest(`/api/teacher/profile?month=${monthQuery}`);
+
+    teacherTotalLessons.textContent = String(data.total_lessons ?? 0);
+    teacherTotalExams.textContent = String(data.total_exams ?? 0);
+
+    // Darslar ro'yxati: Dushanba-Juma ish kunlari
+    teacherLessonsList.replaceChildren();
+    const workdays = data.workdays || [];
+
+    if (workdays.length === 0) {
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "empty-title";
+      emptyDiv.style.padding = "20px";
+      emptyDiv.style.textAlign = "center";
+      emptyDiv.textContent = "Darslar mavjud emas";
+      teacherLessonsList.appendChild(emptyDiv);
+    } else {
+      workdays.forEach((wd) => {
+        const card = document.createElement("div");
+        card.className = "teacher-day-card";
+
+        const header = document.createElement("div");
+        header.className = "teacher-day-header";
+
+        const dateObj = new Date(wd.date);
+        const dayOfWeekIdx = (dateObj.getDay() + 6) % 7; // 0=Dushanba, 4=Juma
+        const weekdayName = WEEKDAYS_UZ[dayOfWeekIdx] || "";
+
+        header.textContent = `${formatDisplayDate(wd.date)} (${weekdayName})`;
+        card.appendChild(header);
+
+        // 1-dars
+        const row1 = document.createElement("div");
+        row1.className = "teacher-lesson-row";
+        const l1Label = document.createElement("span");
+        l1Label.className = "teacher-lesson-num";
+        l1Label.textContent = "1-dars 07:00:";
+        const l1Topic = document.createElement("span");
+        l1Topic.className = "teacher-lesson-topic";
+        l1Topic.textContent = wd.lesson_1?.topic || "Dars o'tilmagan";
+        if (!wd.lesson_1?.topic) l1Topic.style.color = "var(--text-muted)";
+        row1.appendChild(l1Label);
+        row1.appendChild(l1Topic);
+        card.appendChild(row1);
+
+        // 2-dars
+        const row2 = document.createElement("div");
+        row2.className = "teacher-lesson-row";
+        const l2Label = document.createElement("span");
+        l2Label.className = "teacher-lesson-num";
+        l2Label.textContent = "2-dars 15:45:";
+        const l2Topic = document.createElement("span");
+        l2Topic.className = "teacher-lesson-topic";
+        l2Topic.textContent = wd.lesson_2?.topic || "Dars o'tilmagan";
+        if (!wd.lesson_2?.topic) l2Topic.style.color = "var(--text-muted)";
+        row2.appendChild(l2Label);
+        row2.appendChild(l2Topic);
+        card.appendChild(row2);
+
+        teacherLessonsList.appendChild(card);
+      });
+    }
+
+    // Imtihonlar ro'yxati
+    teacherExamsList.replaceChildren();
+    const exams = data.exams || [];
+
+    if (exams.length === 0) {
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "empty-title";
+      emptyDiv.style.padding = "20px";
+      emptyDiv.style.textAlign = "center";
+      emptyDiv.textContent = "Imtihonlar o'tkazilmagan";
+      teacherExamsList.appendChild(emptyDiv);
+    } else {
+      exams.forEach((ex) => {
+        const card = document.createElement("div");
+        card.className = "teacher-exam-card";
+
+        const topRow = document.createElement("div");
+        topRow.className = "lesson-card-top";
+
+        const title = document.createElement("div");
+        title.className = "teacher-exam-title";
+        title.textContent = ex.name;
+
+        const badge = document.createElement("span");
+        badge.className = "lesson-card-badge";
+        badge.textContent = `${formatDisplayDate(ex.date)} (${ex.lesson_no}-dars)`;
+
+        topRow.appendChild(title);
+        topRow.appendChild(badge);
+
+        const sub = document.createElement("div");
+        sub.className = "teacher-exam-sub";
+        sub.textContent = ex.topic;
+
+        card.appendChild(topRow);
+        card.appendChild(sub);
+        teacherExamsList.appendChild(card);
+      });
+    }
+  } catch (err) {
+    console.warn("O'qituvchi profilini yuklashda xato:", err);
+  }
+}
+
+// ====================================================
+// 6. SOZLAMALAR BO'LIMI (PAROL ALMASHTIRISH VA MANBALAR)
+// ====================================================
 const formChangePassword = document.getElementById("formChangePassword");
 formChangePassword?.addEventListener("submit", async (e) => {
   e.preventDefault();
   haptic.impact("medium");
 
-  const oldPassword = document.getElementById("pwdOld").value;
-  const newPassword = document.getElementById("pwdNew").value;
-  const confirmPassword = document.getElementById("pwdConfirm").value;
+  const oldPassword = document.getElementById("oldPasswordInput").value;
+  const newPassword = document.getElementById("newPasswordInput").value;
+  const confirmPassword = document.getElementById("confirmPasswordInput").value;
 
   if (newPassword.length < 4) {
-    showToast("Yangi parol kamida 4 ta belgidan iborat bo'lishi kerak", "error");
+    showToast("Yangi kod kamida 4 ta belgidan iborat bo'lishi kerak", "error");
     return;
   }
 
   if (newPassword !== confirmPassword) {
-    showToast("Yangi parollar bir-biriga mos kelmadi", "error");
+    showToast("Yangi kodlar bir-biriga mos kelmadi", "error");
     return;
   }
 
-  const btnSave = document.getElementById("btnSavePassword");
-  const origText = btnSave.textContent;
-  btnSave.disabled = true;
-  btnSave.textContent = "Saqlanmoqda...";
+  const btnSubmit = document.getElementById("btnSubmitPassword");
+  const origText = btnSubmit.textContent;
+  btnSubmit.disabled = true;
+  btnSubmit.textContent = "Saqlanmoqda...";
 
   const payload = {
     old_password: oldPassword,
@@ -2051,15 +3094,15 @@ formChangePassword?.addEventListener("submit", async (e) => {
     });
 
     haptic.notification("success");
-    showToast("Parol muvaffaqiyatli almashtirildi", "success");
+    showToast("Xavfsizlik kodi muvaffaqiyatli yangilandi", "success");
 
-    document.getElementById("pwdOld").value = "";
-    document.getElementById("pwdNew").value = "";
-    document.getElementById("pwdConfirm").value = "";
+    document.getElementById("oldPasswordInput").value = "";
+    document.getElementById("newPasswordInput").value = "";
+    document.getElementById("confirmPasswordInput").value = "";
   } catch (err) {
   } finally {
-    btnSave.disabled = false;
-    btnSave.textContent = origText;
+    btnSubmit.disabled = false;
+    btnSubmit.textContent = origText;
   }
 });
 
@@ -2083,10 +3126,8 @@ document.getElementById("btnSettingsLogout")?.addEventListener("click", async ()
 // ====================================================
 // MANBALAR BILAN ISHLASH (MODAL VA CRUD)
 // ====================================================
-const sheetSourceActions = document.getElementById("sheetSourceActions");
 const modalSource = document.getElementById("modalSource");
 const formSource = document.getElementById("formSource");
-let selectedSourceForAction = null;
 
 function openAddSourceModal() {
   document.getElementById("modalSourceTitle").textContent = "Manba qo'shish";
@@ -2100,7 +3141,6 @@ function openAddSourceModal() {
 }
 
 function openEditSourceModal(src) {
-  selectedSourceForAction = src;
   document.getElementById("modalSourceTitle").textContent = "Manbani tahrirlash";
   document.getElementById("sourceId").value = src.id;
   document.getElementById("sourceAddFields").classList.add("hidden");
