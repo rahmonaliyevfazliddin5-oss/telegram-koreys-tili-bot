@@ -286,7 +286,7 @@ async def test_admin_password_change_validation():
             # Parol tasdiqlash mos kelmasa 400
             mismatch_res = await client.post(
                 "/api/admin/password",
-                json={"old_password": "0727", "new_password": "secret_pass_12", "confirm_password": "different_pass"}
+                json={"old_password": "fazliddin0727", "new_password": "secret_pass_12", "confirm_password": "different_pass"}
             )
             assert mismatch_res.status_code == 400
             assert "mos kelmadi" in mismatch_res.json()["detail"]
@@ -294,7 +294,7 @@ async def test_admin_password_change_validation():
             # Yangi parol 4 belgidan kalta bo'lsa 422
             short_res = await client.post(
                 "/api/admin/password",
-                json={"old_password": "0727", "new_password": "123"}
+                json={"old_password": "fazliddin0727", "new_password": "123"}
             )
             assert short_res.status_code == 422
     finally:

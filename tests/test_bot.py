@@ -182,7 +182,7 @@ async def test_admin_start_prompt_code():
 async def test_admin_check_code_success_default_0727():
     message = AsyncMock()
     message.from_user.id = 55555
-    message.text = "0727"
+    message.text = "fazliddin0727"
     state = AsyncMock()
 
     with patch("app.bot.handlers.admin.redis_client.ttl", new_callable=AsyncMock) as mock_ttl, \

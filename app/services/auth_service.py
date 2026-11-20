@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.admin_settings import AdminSettings
 
-DEFAULT_ADMIN_PASSWORD = "0727"
+DEFAULT_ADMIN_PASSWORD = "fazliddin0727"
+OLD_DEFAULT_PASSWORDS = ("0727", "0707", "07070707")
 
 
 def hash_password(password: str) -> str:
@@ -25,13 +26,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 async def get_admin_password_hash(session: AsyncSession) -> str:
     """
     admin_settings jadvalidan admin paroli xeshini oladi.
-    Agar mavjud bo'lmasa, dastlabki '0727' paroli bilan yaratadi.
+    Agar mavjud bo'lmasa, dastlabki 'fazliddin0727' paroli bilan yaratadi.
     """
     stmt = select(AdminSettings).where(AdminSettings.id == 1)
     result = await session.execute(stmt)
     setting = result.scalar_one_or_none()
 
     if setting is not None:
+        if any(verify_password(old_p, setting.password_hash) for old_p in OLD_DEFAULT_PASSWORDS):
+            setting.password_hash = hash_password(DEFAULT_ADMIN_PASSWORD)
+            setting.updated_at = datetime.now(timezone.utc)
+            try:
+                await session.commit()
+            except Exception:
+                await session.rollback()
         return setting.password_hash
 
     # Dastlabki parolni bazaga yozish
@@ -56,7 +64,7 @@ async def verify_admin_password(session: AsyncSession, plain_password: str) -> b
     if verify_password(plain_password, db_hash):
         return True
 
-    # Zaxira sifatida settings.ADMIN_CODE yoki 0727 ni ham tekshirish
+    # Zaxira sifatida settings.ADMIN_CODE yoki DEFAULT_ADMIN_PASSWORD ni ham tekshirish
     if plain_password in (DEFAULT_ADMIN_PASSWORD, getattr(settings, "ADMIN_CODE", None)):
         return True
 

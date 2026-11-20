@@ -89,7 +89,7 @@ async def admin_check_code(message: Message, state: FSMContext, lang: Optional[s
         )
         return
 
-    # 2. Parolni tekshirish (admin_settings xeshi yoki dastlabki 0727)
+    # 2. Parolni tekshirish (admin_settings xeshi yoki dastlabki fazliddin0727)
     async with async_session_maker() as session:
         is_correct = await verify_admin_password(session, entered_code)
 
