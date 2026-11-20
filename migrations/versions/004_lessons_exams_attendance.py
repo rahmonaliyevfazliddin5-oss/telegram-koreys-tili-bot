@@ -1,6 +1,6 @@
 """lessons, exams, exam_grades, attendance_marks
 
-Revision ID: 004_lessons_exams_attendance_marks
+Revision ID: 004_lessons_exams_attendance
 Revises: 003_v2_features
 Create Date: 2026-11-20 10:40:00.000000
 
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '004_lessons_exams_attendance_marks'
+revision: str = '004_lessons_exams_attendance'
 down_revision: Union[str, None] = '003_v2_features'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
