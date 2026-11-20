@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, and_, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -9,6 +9,8 @@ from app.api.deps import get_current_admin
 from app.models.grade import Grade
 from app.models.student import Student
 from app.models.lesson import Lesson
+from app.models.attendance import AttendanceMark
+from app.services.attendance_service import format_late_display
 from app.schemas.grade import (
     GradeCreate,
     GradeUpdate,
@@ -36,7 +38,10 @@ async def get_grades(
         grade_date = get_tashkent_now().date()
 
     # Barcha o'quvchilarni olish
-    students_stmt = select(Student).order_by(Student.last_name.asc(), Student.first_name.asc())
+    students_stmt = select(Student).order_by(
+        func.coalesce(func.nullif(Student.last_name, ""), Student.first_name).asc(),
+        Student.first_name.asc()
+    )
     students_res = await db.execute(students_stmt)
     all_students = students_res.scalars().all()
 
@@ -50,22 +55,52 @@ async def get_grades(
     grades_res = await db.execute(grades_stmt)
     grades_map = {g.student_id: g for g in grades_res.scalars().all()}
 
-    return [
-        {
-            "id": grades_map[s.id].id if s.id in grades_map else None,
+    # Shu sana va dars uchun davomat belgilarini olish
+    att_stmt = select(AttendanceMark).where(
+        and_(
+            AttendanceMark.date == grade_date,
+            AttendanceMark.lesson_no == lesson
+        )
+    )
+    att_res = await db.execute(att_stmt)
+    att_map = {a.student_id: a for a in att_res.scalars().all()}
+
+    result = []
+    for s in all_students:
+        g = grades_map.get(s.id)
+        val = g.value if g else None
+        att = att_map.get(s.id)
+
+        if att and att.status == "late":
+            st = "late"
+            late_min = att.late_minutes
+        elif val is not None or (att and att.status == "present"):
+            st = "present"
+            late_min = None
+        else:
+            st = "absent"
+            late_min = None
+
+        full_name = f"{s.last_name} {s.first_name}".strip() if s.last_name else s.first_name
+
+        result.append({
+            "id": g.id if g else None,
             "student_id": s.id,
             "date": str(grade_date),
             "lesson": lesson,
             "kind": "daily",
-            "value": grades_map[s.id].value if s.id in grades_map else None,
-            "created_at": grades_map[s.id].created_at.isoformat() if (s.id in grades_map and grades_map[s.id].created_at) else None,
+            "value": val,
+            "status": st,
+            "late_minutes": late_min,
+            "late_formatted": format_late_display(late_min) if st == "late" else None,
+            "created_at": g.created_at.isoformat() if (g and g.created_at) else None,
             "first_name": s.first_name,
             "last_name": s.last_name or "",
             "grade": s.grade,
-            "student_name": f"{s.first_name} {s.last_name or ''}".strip()
-        }
-        for s in all_students
-    ]
+            "student_name": full_name
+        })
+
+    return result
 
 
 @router.get("/{grade_id}", response_model=GradeResponse)
@@ -153,7 +188,48 @@ async def bulk_save_grades(
         )
 
     items = payload.items or []
+
+    # 1. Server qoidalari validatsiyasi
     for item in items:
+        st = item.status
+        if st is None:
+            if item.late_minutes is not None and item.late_minutes > 0:
+                st = "late"
+            elif item.value is not None:
+                st = "present"
+            else:
+                st = "absent"
+
+        if st == "absent":
+            if item.value is not None or item.late_minutes is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Kelmadi holatida baho yoki kech qolish null bo'lishi shart"
+                )
+        elif st == "late":
+            if item.late_minutes is None or not (1 <= item.late_minutes <= 600):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Kech qoldi holatida late_minutes 1 dan 600 gacha butun son bo'lishi shart"
+                )
+        elif st == "present":
+            if item.late_minutes is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Keldi holatida late_minutes null bo'lishi shart"
+                )
+
+    # 2. Bitta tranzaksiyada saqlash
+    for item in items:
+        st = item.status
+        if st is None:
+            if item.late_minutes is not None and item.late_minutes > 0:
+                st = "late"
+            elif item.value is not None:
+                st = "present"
+            else:
+                st = "absent"
+
         stmt = select(Grade).where(
             and_(
                 Grade.student_id == item.student_id,
@@ -161,11 +237,11 @@ async def bulk_save_grades(
                 Grade.lesson_no == payload.lesson
             )
         )
-        existing = (await db.execute(stmt)).scalar_one_or_none()
+        existing_grade = (await db.execute(stmt)).scalar_one_or_none()
 
-        if item.value is not None and 1 <= item.value <= 5:
-            if existing:
-                existing.value = item.value
+        if item.value is not None and 1 <= item.value <= 5 and st in ("present", "late"):
+            if existing_grade:
+                existing_grade.value = item.value
             else:
                 db.add(Grade(
                     student_id=item.student_id,
@@ -174,9 +250,52 @@ async def bulk_save_grades(
                     value=item.value,
                     created_at=now
                 ))
-        elif item.value is None or item.value == 0:
-            if existing:
-                await db.delete(existing)
+        else:
+            if existing_grade:
+                await db.delete(existing_grade)
+
+        att_stmt = select(AttendanceMark).where(
+            and_(
+                AttendanceMark.student_id == item.student_id,
+                AttendanceMark.date == today,
+                AttendanceMark.lesson_no == payload.lesson
+            )
+        )
+        existing_att = (await db.execute(att_stmt)).scalar_one_or_none()
+
+        if st == "late":
+            if existing_att:
+                existing_att.status = "late"
+                existing_att.late_minutes = item.late_minutes
+            else:
+                db.add(AttendanceMark(
+                    student_id=item.student_id,
+                    date=today,
+                    lesson_no=payload.lesson,
+                    status="late",
+                    late_minutes=item.late_minutes,
+                    created_at=now
+                ))
+        elif st == "present":
+            if item.value is None:
+                if existing_att:
+                    existing_att.status = "present"
+                    existing_att.late_minutes = None
+                else:
+                    db.add(AttendanceMark(
+                        student_id=item.student_id,
+                        date=today,
+                        lesson_no=payload.lesson,
+                        status="present",
+                        late_minutes=None,
+                        created_at=now
+                    ))
+            else:
+                if existing_att:
+                    await db.delete(existing_att)
+        elif st == "absent":
+            if existing_att:
+                await db.delete(existing_att)
 
     await db.commit()
     await invalidate_all_caches()

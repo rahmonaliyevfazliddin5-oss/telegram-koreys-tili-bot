@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import List, Optional, Dict, Any, Union
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, and_, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -68,7 +68,10 @@ async def get_attendance(
     window_open = is_today and (not is_weekend(attendance_date)) and is_lesson_window_open(lesson, target_date=attendance_date, current_time=now.time())
 
     # 4. Barcha o'quvchilarni olish
-    students_stmt = select(Student).order_by(Student.last_name.asc(), Student.first_name.asc())
+    students_stmt = select(Student).order_by(
+        func.coalesce(func.nullif(Student.last_name, ""), Student.first_name).asc(),
+        Student.first_name.asc()
+    )
     students_res = await db.execute(students_stmt)
     all_students = students_res.scalars().all()
 

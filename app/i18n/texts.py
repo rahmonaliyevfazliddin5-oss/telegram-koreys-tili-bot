@@ -106,6 +106,11 @@ TEXTS: Dict[str, Dict[str, str]] = {
         "en": "Lesson has not started",
         "ru": "Урок не начат"
     },
+    "attendance_in_progress": {
+        "uz": "Dars davom etmoqda",
+        "en": "Lesson in progress",
+        "ru": "Урок продолжается"
+    },
     "attendance_not_taken": {
         "uz": "Davomat olinmagan",
         "en": "Attendance not recorded",

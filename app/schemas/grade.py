@@ -1,11 +1,13 @@
 from datetime import date, datetime
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 class GradeItem(BaseModel):
     student_id: int
+    status: Optional[Literal["present", "absent", "late"]] = None
     value: Optional[int] = Field(None, ge=1, le=5)
+    late_minutes: Optional[int] = None
 
 
 class GradesBulkUpdate(BaseModel):

@@ -1,9 +1,12 @@
+import re
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from redis.asyncio import Redis
 from sqlalchemy import select, or_, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.redis import get_redis
 from app.api.deps import get_current_admin
 from app.models.student import Student
 from app.models.attendance import AttendanceMark
@@ -22,6 +25,10 @@ from app.schemas.student import (
     LedgerResponse
 )
 from app.schemas.attendance import format_late_display
+from app.services.attendance_service import (
+    get_student_derived_attendance_stats,
+    get_student_attendance_history
+)
 from app.services.cache_service import invalidate_all_caches
 
 router = APIRouter()
@@ -43,22 +50,28 @@ async def get_student_debt(db: AsyncSession, student_id: int) -> int:
 @router.get("", response_model=List[StudentResponse])
 async def get_students(
     search: Optional[str] = Query(None, description="Ism, familiya yoki sinf bo'yicha qidiruv"),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(500, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_current_admin)
 ):
     stmt = select(Student)
     if search:
-        search_term = f"%{search.strip()}%"
-        stmt = stmt.where(
-            or_(
-                Student.first_name.ilike(search_term),
-                Student.last_name.ilike(search_term),
-                Student.grade.ilike(search_term)
+        s_clean = re.sub(r"[‘’’ʻ`]", "%", search.strip())
+        tokens = [t.strip() for t in s_clean.split() if t.strip()]
+        for token in tokens:
+            search_pattern = f"%{token}%"
+            stmt = stmt.where(
+                or_(
+                    Student.first_name.ilike(search_pattern),
+                    Student.last_name.ilike(search_pattern),
+                    Student.grade.ilike(search_pattern)
+                )
             )
-        )
-    stmt = stmt.order_by(Student.last_name.asc(), Student.first_name.asc()).offset(offset).limit(limit)
+    stmt = stmt.order_by(
+        func.coalesce(func.nullif(Student.last_name, ""), Student.first_name).asc(),
+        Student.first_name.asc()
+    ).offset(offset).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
 
@@ -123,19 +136,8 @@ async def get_student_profile(
             detail="O'quvchi topilmadi"
         )
 
-    # 1. Jami dars qoldirgan
-    abs_stmt = select(func.count(AttendanceMark.id)).where(
-        AttendanceMark.student_id == student_id,
-        AttendanceMark.status == "absent"
-    )
-    total_absences = (await db.execute(abs_stmt)).scalar_one() or 0
-
-    # 2. Jami kech qolgan
-    late_stmt = select(func.count(AttendanceMark.id)).where(
-        AttendanceMark.student_id == student_id,
-        AttendanceMark.status == "late"
-    )
-    total_lates = (await db.execute(late_stmt)).scalar_one() or 0
+    # 1. Jami dars qoldirgan va 2. Jami kech qolgan (yakunlangan darslar bo'yicha hosil qilingan)
+    total_absences, total_lates = await get_student_derived_attendance_stats(db, student_id, student.created_at)
 
     # 3. Dars jarayonida olgan ball (dars baholari yig'indisi)
     grades_stmt = select(func.coalesce(func.sum(Grade.value), 0)).where(Grade.student_id == student_id)
@@ -169,24 +171,18 @@ async def get_student_profile(
         for item in ledger_items
     ]
 
-    # Oxirgi davomat yozuvlari ro'yxati
-    att_stmt = (
-        select(AttendanceMark)
-        .where(AttendanceMark.student_id == student_id)
-        .order_by(AttendanceMark.date.desc(), AttendanceMark.lesson_no.desc())
-        .limit(50)
-    )
-    att_records = (await db.execute(att_stmt)).scalars().all()
+    # Oxirgi davomat yozuvlari ro'yxati (har yakunlangan dars: 'Kelmadi' yoki '+15 daqiqa kech qoldi')
+    att_records = await get_student_attendance_history(db, student_id, student.created_at)
     attendance_history = [
         AttendanceHistoryItem(
-            id=m.id,
-            date=m.date.isoformat(),
-            lesson=m.lesson_no,
-            status=m.status,
-            status_text="Kelmadi" if m.status == "absent" else (format_late_display(m.late_minutes) or "Kech qoldi"),
-            late_minutes=m.late_minutes
+            id=m["id"],
+            date=m["date"],
+            lesson=m["lesson"],
+            status=m["status"],
+            status_text=m["status_text"],
+            late_minutes=m["late_minutes"]
         )
-        for m in att_records
+        for m in att_records[:50]
     ]
 
     student_dict = {
@@ -228,11 +224,26 @@ async def add_fine(
     student_id: int,
     payload: FineCreate,
     db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
     admin: dict = Depends(get_current_admin)
 ):
     """
     O'quvchiga jarima belgilash (+10 000 so'm yoki ixtiyoriy musbat summa).
     """
+    # Takroriy so'rovdan himoya (anti-double-click / idempotency)
+    lock_key = f"lock:fine:{student_id}"
+    try:
+        acquired = await redis.set(lock_key, "1", ex=2, nx=True)
+        if not acquired:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Jarima so'rovi allaqachon bajarilmoqda"
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
     student = await db.get(Student, student_id)
     if not student:
         raise HTTPException(
@@ -273,12 +284,26 @@ async def collect_debt(
     student_id: int,
     payload: CollectCreate,
     db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
     admin: dict = Depends(get_current_admin)
 ):
     """
     O'quvchidan qarz undirish (to'lov kiritish).
     Jami qarz hech qachon manfiy bo'lmaydi.
     """
+    lock_key = f"lock:collect:{student_id}"
+    try:
+        acquired = await redis.set(lock_key, "1", ex=2, nx=True)
+        if not acquired:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="To'lov so'rovi allaqachon bajarilmoqda"
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
     student = await db.get(Student, student_id)
     if not student:
         raise HTTPException(
