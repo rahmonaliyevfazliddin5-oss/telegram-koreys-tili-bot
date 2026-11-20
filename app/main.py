@@ -20,7 +20,7 @@ from app.database import engine, get_db
 from app.redis import get_redis, close_redis
 from app.bot.loader import bot, dp
 from app.api.deps import get_current_admin
-from app.api.routers import students, attendance, grades, sources, admin_auth, status, lessons, exams
+from app.api.routers import students, attendance, grades, sources, admin_auth, status, lessons, exams, teacher
 
 logging.basicConfig(
     level=logging.INFO,
@@ -153,6 +153,7 @@ app.include_router(grades.router, prefix="/api/grades", tags=["Grades"])
 app.include_router(sources.router, prefix="/api/sources", tags=["Sources"])
 app.include_router(lessons.router, prefix="/api/lessons", tags=["Lessons"])
 app.include_router(exams.router, prefix="/api/exams", tags=["Exams"])
+app.include_router(teacher.router, prefix="/api/teacher", tags=["Teacher"])
 
 
 @app.get("/api/rating", tags=["Students"])
