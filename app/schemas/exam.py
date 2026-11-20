@@ -40,6 +40,9 @@ class ExamGradeItem(BaseModel):
 class ExamGradeStudentResponse(BaseModel):
     student_id: int
     student_name: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    grade: Optional[str] = None
     value: Optional[int] = None
     modifier: Optional[str] = None
 

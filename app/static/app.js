@@ -170,24 +170,25 @@ async function handleBackNavigation() {
 
   // 4. Imtihon ichidagi o'quvchilar ro'yxatidan orqaga qaytish
   if (currentTabId === "tabGrades" && currentGradeKind === "exam" && selectedExam) {
+    const canLeave = await confirmDiscardChangesIfNeeded();
+    if (!canLeave) return;
     selectedExam = null;
     loadExamsList();
+    updateBackButton();
+    syncSaveBarForCurrentScreen();
     return;
   }
 
-  // 5. Agar bosh sahifada bo'lmasa, Bosh sahifaga qaytish
-  if (currentTabId !== "tabHome") {
-    switchTab("tabHome");
-    return;
-  }
-
-  // 6. Bosh sahifada orqaga bosilganda POST /api/admin/logout va WebApp.close()
-  try {
-    await apiRequest("/api/admin/logout", { method: "POST" });
-  } catch (err) {
-    console.warn("Logout xatosi:", err);
-  } finally {
-    if (tg) tg.close();
+  // 5. Asosiy 4 sahifada orqaga bosilganda: adminlikdan chiqish
+  const confirmed = await confirmAction("Admin paneldan chiqishni xohlaysizmi?", "Chiqish");
+  if (confirmed) {
+    try {
+      await apiRequest("/api/admin/logout", { method: "POST" });
+    } catch (err) {
+      console.warn("Logout xatosi:", err);
+    } finally {
+      if (tg) tg.close();
+    }
   }
 }
 
@@ -346,6 +347,14 @@ async function apiRequest(endpoint, options = {}) {
       const err = await response.json().catch(() => ({ detail: "Noto'g'ri ma'lumot kiritildi" }));
       throw new Error(err.detail || "Noto'g'ri ma'lumot kiritildi");
     }
+    if (response.status === 423) {
+      showBlocked(1800);
+      throw new Error("Admin kirish bloklangan");
+    }
+    if (response.status >= 500) {
+      const err = await response.json().catch(() => ({ detail: "Serverda xatolik yuz berdi" }));
+      throw new Error(err.detail || "Serverda xatolik yuz berdi");
+    }
     if (response.status === 204) {
       return null;
     }
@@ -355,10 +364,15 @@ async function apiRequest(endpoint, options = {}) {
     }
     return await response.json();
   } catch (err) {
+    let msg = err.message || "Xatolik yuz berdi";
+    if (err.name === "TypeError" && err.message && err.message.toLowerCase().includes("fetch")) {
+      msg = "Tarmoq xatosi: server bilan aloqa mavjud emas";
+    }
     if (err.message !== "Ruxsat berilmagan") {
       haptic.notification("error");
-      showToast(err.message, "error");
+      showToast(msg, "error");
     }
+    console.error("API xatosi:", msg);
     throw err;
   }
 }
@@ -401,9 +415,41 @@ function showBlocked(ttlSeconds) {
 const navItems = document.querySelectorAll(".nav-item");
 const tabContents = document.querySelectorAll(".tab-content");
 const fabAdd = document.getElementById("fabAdd");
+const fabAddExam = document.getElementById("fabAddExam");
 let currentTabId = "tabHome";
 
-function switchTab(tabId) {
+let isAttDirty = false;
+let isGradeDailyDirty = false;
+let isGradeExamDirty = false;
+
+function hasUnsavedChanges() {
+  if (currentTabId === "tabGrades") {
+    if (currentGradeKind === "daily" && isGradeDailyDirty) return true;
+    if (currentGradeKind === "exam" && selectedExam && isGradeExamDirty) return true;
+  }
+  return false;
+}
+
+async function confirmDiscardChangesIfNeeded() {
+  if (!hasUnsavedChanges()) return true;
+  const proceed = await confirmAction(
+    "Saqlanmagan o'zgarishlar bor. Haqiqatan ham sahifadan chiqmoqchimisiz?",
+    "Saqlanmagan o'zgarishlar"
+  );
+  if (proceed) {
+    isAttDirty = false;
+    isGradeDailyDirty = false;
+    isGradeExamDirty = false;
+  }
+  return proceed;
+}
+
+async function switchTab(tabId) {
+  if (tabId !== currentTabId) {
+    const canLeave = await confirmDiscardChangesIfNeeded();
+    if (!canLeave) return;
+  }
+
   currentTabId = tabId;
 
   navItems.forEach((n) => {
@@ -427,29 +473,36 @@ function switchTab(tabId) {
   if (headerTitle) {
     if (tabId === "tabHome") headerTitle.textContent = "Kurs Boshqaruvi";
     else if (tabId === "tabStudents") headerTitle.textContent = "O'quvchilar";
-    else if (tabId === "tabAttendance") headerTitle.textContent = "Davomat";
     else if (tabId === "tabGrades") headerTitle.textContent = "Baholash";
     else if (tabId === "tabSettings") headerTitle.textContent = "Sozlamalar";
   }
 
-  // FAB ko'rinishi: FAQAT O'quvchilar sahifasida
+  // FAB ko'rinishi
   if (currentTabId === "tabStudents") {
     fabAdd?.classList.remove("hidden");
+    fabAddExam?.classList.add("hidden");
+  } else if (currentTabId === "tabGrades" && currentGradeKind === "exam" && !selectedExam) {
+    fabAdd?.classList.add("hidden");
+    fabAddExam?.classList.remove("hidden");
   } else {
     fabAdd?.classList.add("hidden");
+    fabAddExam?.classList.add("hidden");
   }
 
   updateBackButton();
 
   if (tabId === "tabHome") loadHomeDashboard();
   else if (tabId === "tabStudents") loadStudents();
-  else if (tabId === "tabAttendance") {
-    renderAttendanceCalendar();
-    loadAttendance();
-  } else if (tabId === "tabGrades") {
-    renderGradesCalendar();
-    loadGrades();
+  else if (tabId === "tabGrades") {
+    renderGradesWeekStrip();
+    if (currentGradeKind === "daily") {
+      await loadGrades();
+    } else {
+      await loadExamsList();
+    }
   }
+
+  syncSaveBarForCurrentScreen();
 }
 
 navItems.forEach((item) => {
@@ -467,6 +520,23 @@ fabAdd?.addEventListener("click", () => {
   }
 });
 
+fabAddExam?.addEventListener("click", () => {
+  haptic.impact("light");
+  openStartExamSheet();
+});
+
+// Klaviatura ochilganda tab panelni yashirish
+document.addEventListener("focusin", (e) => {
+  if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
+    document.body.classList.add("keyboard-open");
+  }
+});
+document.addEventListener("focusout", (e) => {
+  if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) {
+    document.body.classList.remove("keyboard-open");
+  }
+});
+
 // ====================================================
 // Sanalar va Vaqt Formati (24-soatlik format, Asia/Tashkent)
 // ====================================================
@@ -480,11 +550,227 @@ const WEEKDAYS_UZ = [
 ];
 
 function getTodayString() {
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, "0");
-  const d = String(today.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  if (systemStatus && systemStatus.date) {
+    return systemStatus.date;
+  }
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date());
+  } catch (e) {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+}
+
+// Universal Ism va Formatlash
+function formatStudentFullName(st) {
+  if (!st) return "";
+  const firstName = (st.first_name || "").trim();
+  const lastName = (st.last_name || "").trim();
+  if (lastName && lastName !== "None" && lastName !== "null" && lastName !== "undefined") {
+    return `${lastName} ${firstName}`.trim();
+  }
+  if (firstName && firstName !== "None" && firstName !== "null" && firstName !== "undefined") {
+    return firstName;
+  }
+  if (st.student_name) return String(st.student_name).trim();
+  if (st.name) return String(st.name).trim();
+  return "";
+}
+
+function normalizeSearchText(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/[‘’’ʻ`]/g, "'")
+    .toLowerCase()
+    .trim();
+}
+
+function matchStudentSearchAndClass(st, query, selectedClass) {
+  if (selectedClass && selectedClass !== "all") {
+    if (!st.grade || String(st.grade).trim() !== String(selectedClass).trim()) {
+      return false;
+    }
+  }
+
+  if (!query) return true;
+
+  const normalizedQuery = normalizeSearchText(query);
+  const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+
+  const combined = normalizeSearchText(
+    `${st.last_name || ""} ${st.first_name || ""} ${st.student_name || ""} ${st.name || ""} ${st.grade || ""}`
+  );
+  return tokens.every(token => combined.includes(token));
+}
+
+function sortStudentsAlphabetically(students) {
+  return [...students].sort((a, b) => {
+    const lastA = (a.last_name || "").trim();
+    const lastB = (b.last_name || "").trim();
+    const firstA = (a.first_name || "").trim();
+    const firstB = (b.first_name || "").trim();
+
+    // Natural sort: primary key is last_name if present, else first_name
+    const keyA = (lastA && lastA !== "None" && lastA !== "null") ? lastA : firstA;
+    const keyB = (lastB && lastB !== "None" && lastB !== "null") ? lastB : firstB;
+
+    const cmp = keyA.localeCompare(keyB, "uz", { sensitivity: "base" });
+    if (cmp !== 0) return cmp;
+    return firstA.localeCompare(firstB, "uz", { sensitivity: "base" });
+  });
+}
+
+function getDuplicateNameSet(students) {
+  const counts = new Map();
+  for (const st of students) {
+    const name = formatStudentFullName(st).toLowerCase();
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  const duplicates = new Set();
+  counts.forEach((count, name) => {
+    if (count > 1) duplicates.add(name);
+  });
+  return duplicates;
+}
+
+function renderClassChips(containerId, students, selectedClass, onSelect) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  container.replaceChildren();
+
+  const classesSet = new Set();
+  for (const st of students) {
+    if (st.grade && String(st.grade).trim()) {
+      classesSet.add(String(st.grade).trim());
+    }
+  }
+
+  const sortedClasses = Array.from(classesSet).sort((a, b) => {
+    const numA = parseInt(a, 10);
+    const numB = parseInt(b, 10);
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+    return a.localeCompare(b);
+  });
+
+  const allChip = document.createElement("button");
+  allChip.type = "button";
+  allChip.className = `class-chip ${selectedClass === "all" ? "active" : ""}`;
+  allChip.textContent = "Hammasi";
+  allChip.onclick = () => {
+    haptic.selection();
+    onSelect("all");
+  };
+  container.appendChild(allChip);
+
+  sortedClasses.forEach(cls => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `class-chip ${selectedClass === cls ? "active" : ""}`;
+    chip.textContent = cls;
+    chip.onclick = () => {
+      haptic.selection();
+      onSelect(cls);
+    };
+    container.appendChild(chip);
+  });
+}
+
+// Global Save Bar Komponenti
+let isGlobalSaveInProgress = false;
+
+function removeGlobalSaveBar() {
+  const existing = document.getElementById("globalSaveBar");
+  if (existing) {
+    existing.remove();
+  }
+}
+
+function renderGlobalSaveBar({ type, onClick, isEnabled, isClosedWindow }) {
+  removeGlobalSaveBar();
+
+  const container = document.getElementById("globalSaveContainer") || document.body;
+  const bar = document.createElement("div");
+  bar.id = "globalSaveBar";
+  bar.className = "global-save-bar";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = "btnGlobalSaveAction";
+  btn.className = "btn btn-primary btn-block btn-save-action";
+
+  if (isClosedWindow) {
+    btn.classList.add("is-disabled-window");
+    btn.disabled = true;
+  } else if (!isEnabled) {
+    btn.disabled = true;
+  }
+
+  btn.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+      <polyline points="17 21 17 13 7 13 7 21"></polyline>
+      <polyline points="7 3 7 8 15 8"></polyline>
+    </svg>
+    <span id="btnGlobalSaveText">Saqlash</span>
+  `;
+
+  btn.onclick = async () => {
+    if (isGlobalSaveInProgress || btn.disabled) return;
+    isGlobalSaveInProgress = true;
+    btn.disabled = true;
+    const textEl = document.getElementById("btnGlobalSaveText");
+    if (textEl) {
+      textEl.innerHTML = '<span class="btn-spinner"></span>Saqlanmoqda...';
+    }
+    try {
+      await onClick();
+    } finally {
+      isGlobalSaveInProgress = false;
+      const t = document.getElementById("btnGlobalSaveText");
+      if (t) t.textContent = "Saqlash";
+      syncSaveBarForCurrentScreen();
+    }
+  };
+
+  bar.appendChild(btn);
+  container.appendChild(bar);
+}
+
+function syncSaveBarForCurrentScreen() {
+  if (currentTabId === "tabGrades") {
+    if (currentGradeKind === "daily") {
+      const isToday = currentGradeDate === getTodayString();
+      const isWindowOpen = isLessonWindowOpen(currentGradeLesson) && isToday && !systemStatus.is_weekend;
+      const isStarted = currentGradeIsStarted;
+      const isClosed = !isWindowOpen || !isStarted;
+      const hasChanges = isGradeDailyDirty;
+
+      renderGlobalSaveBar({
+        type: "daily_grades",
+        onClick: executeSaveDailyGrades,
+        isEnabled: !isClosed && hasChanges,
+        isClosedWindow: isClosed
+      });
+    } else if (currentGradeKind === "exam" && selectedExam) {
+      const isToday = currentGradeDate === getTodayString();
+      const isWindowOpen = isLessonWindowOpen(selectedExam.lesson_no) && isToday && !systemStatus.is_weekend;
+      const isClosed = !isWindowOpen;
+      const hasChanges = isGradeExamDirty;
+
+      renderGlobalSaveBar({
+        type: "exam_grades",
+        onClick: executeSaveExamGrades,
+        isEnabled: !isClosed && hasChanges,
+        isClosedWindow: isClosed
+      });
+    } else {
+      removeGlobalSaveBar();
+    }
+  } else {
+    removeGlobalSaveBar();
+  }
 }
 
 function formatDisplayDate(dateStr) {
@@ -568,18 +854,39 @@ let systemStatus = {
   exams_today: []
 };
 
+let hasUserSelectedAttDate = false;
+let hasUserSelectedGradeDate = false;
+
 async function fetchStatus() {
   try {
     const data = await apiRequest("/api/status");
     if (data) {
       systemStatus.is_weekend = Boolean(data.is_weekend);
       systemStatus.current_time = data.current_time || data.server_time || "";
+      systemStatus.server_time = data.server_time || "";
+      systemStatus.date = data.date || "";
       systemStatus.is_blocked = Boolean(data.is_blocked);
       systemStatus.block_ttl = data.block_ttl || 0;
       systemStatus.active_lesson = data.active_lesson || 1;
       systemStatus.lesson_1 = data.lesson_1 || null;
       systemStatus.lesson_2 = data.lesson_2 || null;
-      systemStatus.exams_today = data.exams_today || [];
+      systemStatus.exams = data.exams || [];
+      systemStatus.exams_today = data.exams || [];
+
+      if (data.date) {
+        if (!hasUserSelectedAttDate) {
+          currentAttDate = data.date;
+          const [y, m] = data.date.split("-").map(Number);
+          currentAttCalYear = y;
+          currentAttCalMonth = m - 1;
+        }
+        if (!hasUserSelectedGradeDate) {
+          currentGradeDate = data.date;
+          const [y, m] = data.date.split("-").map(Number);
+          currentGradeCalYear = y;
+          currentGradeCalMonth = m - 1;
+        }
+      }
 
       if (data.lesson_1) {
         systemStatus.lesson1_open = Boolean(data.lesson_1.is_open);
@@ -610,12 +917,18 @@ async function fetchStatus() {
     if (currentTabId === "tabHome") {
       updateHomeStatusBanner();
     }
+    syncSaveBarForCurrentScreen();
   }
 }
 
 setInterval(fetchStatus, 30000);
 window.addEventListener("focus", () => {
   fetchStatus();
+});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    fetchStatus();
+  }
 });
 
 function isLessonWindowOpen(lesson) {
@@ -691,7 +1004,8 @@ function updateTodayCardsUI() {
   const topicExam = document.getElementById("topicExam");
 
   const anyOpen = (isL1Open || isL2Open) && !systemStatus.is_weekend;
-  const examsCount = systemStatus.exams_today ? systemStatus.exams_today.length : 0;
+  const exams = systemStatus.exams || systemStatus.exams_today || [];
+  const examsCount = exams.length;
 
   if (cardExam && badgeExam && topicExam) {
     badgeExam.className = "lesson-card-badge";
@@ -705,7 +1019,11 @@ function updateTodayCardsUI() {
       if (examsCount > 0) {
         badgeExam.classList.add("badge-started");
         badgeExam.textContent = "Boshlangan";
-        topicExam.textContent = `${examsCount} ta imtihon ochilgan`;
+        if (examsCount === 1) {
+          topicExam.textContent = exams[0].name;
+        } else {
+          topicExam.textContent = `${examsCount} ta imtihon ochilgan`;
+        }
       } else {
         badgeExam.classList.add("badge-not-started");
         badgeExam.textContent = "Boshlanmagan";
@@ -822,23 +1140,41 @@ async function loadHomeAttendanceRing() {
   if (lessonBadge) lessonBadge.textContent = `${activeLesson}-dars ${activeLesson === 1 ? "07:00" : "15:45"}`;
 
   try {
-    const res = await apiRequest(`/api/attendance?date=${todayStr}&lesson=${activeLesson}`);
+    let isStarted = false;
+    try {
+      const lessonRes = await apiRequest(`/api/lessons?date=${todayStr}&lesson=${activeLesson}`);
+      isStarted = Boolean(lessonRes && lessonRes.topic);
+    } catch (_) {
+      isStarted = false;
+    }
 
-    let total = 0;
-    let absent = 0;
+    const res = await apiRequest(`/api/grades?date=${todayStr}&lesson=${activeLesson}&kind=daily`);
+    const items = Array.isArray(res) ? res : (res?.items || []);
+
+    const total = items.length;
     let present = 0;
+    let absent = 0;
     let percentage = 0;
 
-    if (res) {
-      total = res.total_students ?? 0;
-      absent = res.absent_count ?? 0;
-      present = res.present_count ?? Math.max(0, total - absent);
-
-      if (res.percentage !== undefined) {
-        percentage = Math.round(res.percentage);
-      } else if (total > 0) {
-        percentage = Math.round((present / total) * 100);
+    if (!isStarted || systemStatus.is_weekend) {
+      if (ringDateSub) ringDateSub.textContent = `${formatDisplayDate(todayStr)} • Olinmagan`;
+      if (presentEl) presentEl.textContent = "0";
+      if (absentEl) absentEl.textContent = "0";
+      if (totalEl) totalEl.textContent = String(total);
+      if (percentText) percentText.textContent = "0%";
+      if (ringFill) {
+        ringFill.style.stroke = "var(--color-border)";
+        ringFill.style.strokeDashoffset = "289";
       }
+      return;
+    }
+
+    present = items.filter((s) => s.status === "present" || s.status === "late").length;
+    absent = Math.max(0, total - present);
+    percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+
+    if (ringDateSub) {
+      ringDateSub.textContent = `${formatDisplayDate(todayStr)} • Jonli`;
     }
 
     if (presentEl) presentEl.textContent = String(present);
@@ -847,6 +1183,7 @@ async function loadHomeAttendanceRing() {
     if (percentText) percentText.textContent = `${percentage}%`;
 
     if (ringFill) {
+      ringFill.style.stroke = "var(--primary-red)";
       const circumference = 289;
       const offset = circumference - (percentage / 100) * circumference;
       ringFill.style.strokeDashoffset = String(offset);
@@ -1118,9 +1455,22 @@ function openStartExamSheet() {
   updateBackButton();
 }
 
-document.getElementById("cardTodayExam")?.addEventListener("click", () => {
+document.getElementById("cardTodayExam")?.addEventListener("click", async () => {
   haptic.impact("light");
-  openStartExamSheet();
+  const exams = systemStatus.exams || [];
+  if (exams.length === 0) {
+    openStartExamSheet();
+  } else if (exams.length === 1) {
+    await switchTab("tabGrades");
+    document.getElementById("btnGradeKindExam")?.click();
+    selectedExam = exams[0];
+    await loadExamGrades(exams[0].id);
+  } else {
+    await switchTab("tabGrades");
+    document.getElementById("btnGradeKindExam")?.click();
+    selectedExam = null;
+    await loadExamsList();
+  }
 });
 
 formStartExam?.addEventListener("submit", async (e) => {
@@ -1144,7 +1494,7 @@ formStartExam?.addEventListener("submit", async (e) => {
   btnSubmitStartExam.textContent = "Ochilmoqda...";
 
   try {
-    await apiRequest("/api/exams", {
+    const res = await apiRequest("/api/exams", {
       method: "POST",
       body: JSON.stringify({
         name,
@@ -1159,9 +1509,12 @@ formStartExam?.addEventListener("submit", async (e) => {
     updateBackButton();
 
     await fetchStatus();
-    if (currentTabId === "tabGrades" && currentGradeKind === "exam") {
-      await loadExamsList();
-    }
+
+    // AVTOMATIK shu imtihonning baholash ekraniga o'tish
+    await switchTab("tabGrades");
+    document.getElementById("btnGradeKindExam")?.click();
+    selectedExam = res;
+    await loadExamGrades(res.id);
   } catch (err) {
   } finally {
     btnSubmitStartExam.disabled = false;
@@ -1185,6 +1538,7 @@ const sheetCollectDebt = document.getElementById("sheetCollectDebt");
 const formCollectDebt = document.getElementById("formCollectDebt");
 
 let searchDebounceTimeout = null;
+let studentsSelectedClass = "all";
 
 async function loadStudents() {
   studentsLoaderEl?.classList.remove("hidden");
@@ -1210,7 +1564,7 @@ studentSearchInput?.addEventListener("input", () => {
   clearTimeout(searchDebounceTimeout);
   searchDebounceTimeout = setTimeout(() => {
     loadStudents();
-  }, 240);
+  }, 250);
 });
 
 btnClearSearch?.addEventListener("click", () => {
@@ -1223,7 +1577,24 @@ btnClearSearch?.addEventListener("click", () => {
 function renderStudents() {
   studentsListEl.replaceChildren();
 
-  if (!allStudents || allStudents.length === 0) {
+  renderClassChips("studentsClassChips", allStudents, studentsSelectedClass, (cls) => {
+    studentsSelectedClass = cls;
+    renderStudents();
+  });
+
+  let filtered = allStudents.filter(st => {
+    if (studentsSelectedClass !== "all") {
+      if (!st.grade || String(st.grade).trim() !== String(studentsSelectedClass).trim()) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  filtered = sortStudentsAlphabetically(filtered);
+  const duplicateNames = getDuplicateNameSet(filtered);
+
+  if (!filtered || filtered.length === 0) {
     const emptyCard = document.createElement("div");
     emptyCard.className = "card empty-card";
 
@@ -1241,14 +1612,14 @@ function renderStudents() {
     return;
   }
 
-  allStudents.forEach((st) => {
+  filtered.forEach((st) => {
     const card = document.createElement("div");
     card.className = "card student-row-card";
 
     const cardLeft = document.createElement("div");
     cardLeft.className = "card-left";
 
-    const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
+    const studentFullName = formatStudentFullName(st);
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
@@ -1263,10 +1634,16 @@ function renderStudents() {
     title.textContent = studentFullName;
     info.appendChild(title);
 
+    const hasDuplicate = duplicateNames.has(studentFullName.toLowerCase());
     if (st.grade && st.grade.trim() !== "") {
       const subtitle = document.createElement("div");
       subtitle.className = "card-subtitle";
       subtitle.textContent = `Sinf: ${st.grade.trim()}`;
+      info.appendChild(subtitle);
+    } else if (hasDuplicate) {
+      const subtitle = document.createElement("div");
+      subtitle.className = "card-subtitle";
+      subtitle.textContent = "Sinfi yo'q";
       info.appendChild(subtitle);
     }
 
@@ -1457,15 +1834,18 @@ document.getElementById("btnCloseProfile")?.addEventListener("click", () => {
 // Jarima belgilash (+10 000 so'm, confirm dialog bilan)
 document.getElementById("btnProfAddFine")?.addEventListener("click", async () => {
   if (!selectedStudentForProfile) return;
+  const btn = document.getElementById("btnProfAddFine");
+  if (btn?.disabled) return;
   haptic.impact("medium");
 
-  const studentName = `${selectedStudentForProfile.first_name || ""} ${selectedStudentForProfile.last_name || ""}`.trim();
+  const studentName = formatStudentFullName(selectedStudentForProfile);
   const confirmed = await confirmAction(
     `"${studentName}" o'quvchisiga 10 000 so'm jarima belgilashni tasdiqlaysizmi?`,
     "Jarima belgilash"
   );
 
   if (confirmed) {
+    if (btn) btn.disabled = true;
     try {
       await apiRequest(`/api/students/${selectedStudentForProfile.id}/fine`, {
         method: "POST",
@@ -1474,7 +1854,10 @@ document.getElementById("btnProfAddFine")?.addEventListener("click", async () =>
       haptic.notification("success");
       showToast("10 000 so'm jarima belgilandi", "success");
       await reloadProfileData(selectedStudentForProfile.id);
-    } catch (err) {}
+    } catch (err) {
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 });
 
@@ -1662,6 +2045,8 @@ let attStateMap = new Map(); // student_id => { status: "present"|"absent"|"late
 let attStudentsList = [];
 let currentAttIsStarted = false;
 let currentAttTopic = "";
+let attSearchQuery = "";
+let attSelectedClass = "all";
 
 const attendanceListEl = document.getElementById("attendanceList");
 const attendanceLoaderEl = document.getElementById("attendanceLoader");
@@ -1671,26 +2056,53 @@ const attSelectedDateTitleEl = document.getElementById("attSelectedDateTitle");
 const attSummaryStatEl = document.getElementById("attSummaryStat");
 const attLessonTopicText = document.getElementById("attLessonTopicText");
 const attTopicWarningBanner = document.getElementById("attTopicWarningBanner");
-const btnSaveAttendance = document.getElementById("btnSaveAttendance");
+const attSearchInput = document.getElementById("attSearchInput");
+const btnClearAttSearch = document.getElementById("btnClearAttSearch");
+let attSearchDebounce = null;
 
-document.getElementById("btnAttLesson1")?.addEventListener("click", () => {
+attSearchInput?.addEventListener("input", () => {
+  if (attSearchInput.value.length > 0) {
+    btnClearAttSearch?.classList.remove("hidden");
+  } else {
+    btnClearAttSearch?.classList.add("hidden");
+  }
+  clearTimeout(attSearchDebounce);
+  attSearchDebounce = setTimeout(() => {
+    attSearchQuery = attSearchInput.value.trim();
+    renderAttendanceList();
+  }, 250);
+});
+
+btnClearAttSearch?.addEventListener("click", () => {
+  haptic.impact("light");
+  attSearchInput.value = "";
+  btnClearAttSearch.classList.add("hidden");
+  attSearchQuery = "";
+  renderAttendanceList();
+});
+
+document.getElementById("btnAttLesson1")?.addEventListener("click", async () => {
   if (currentAttLesson === 1) return;
+  const canLeave = await confirmDiscardChangesIfNeeded();
+  if (!canLeave) return;
   haptic.selection();
   currentAttLesson = 1;
   document.getElementById("btnAttLesson1")?.classList.add("active");
   document.getElementById("btnAttLesson2")?.classList.remove("active");
   updateWindowStatusUI();
-  loadAttendance();
+  await loadAttendance();
 });
 
-document.getElementById("btnAttLesson2")?.addEventListener("click", () => {
+document.getElementById("btnAttLesson2")?.addEventListener("click", async () => {
   if (currentAttLesson === 2) return;
+  const canLeave = await confirmDiscardChangesIfNeeded();
+  if (!canLeave) return;
   haptic.selection();
   currentAttLesson = 2;
   document.getElementById("btnAttLesson2")?.classList.add("active");
   document.getElementById("btnAttLesson1")?.classList.remove("active");
   updateWindowStatusUI();
-  loadAttendance();
+  await loadAttendance();
 });
 
 function renderAttendanceCalendar() {
@@ -1741,11 +2153,15 @@ function renderAttendanceCalendar() {
       dayEl.appendChild(dot);
     }
 
-    dayEl.onclick = () => {
+    dayEl.onclick = async () => {
+      if (fullDate === currentAttDate) return;
+      const canLeave = await confirmDiscardChangesIfNeeded();
+      if (!canLeave) return;
+      hasUserSelectedAttDate = true;
       haptic.selection();
       currentAttDate = fullDate;
       renderAttendanceCalendar();
-      loadAttendance();
+      await loadAttendance();
     };
 
     attCalendarGridEl.appendChild(dayEl);
@@ -1798,19 +2214,22 @@ async function loadAttendance() {
     if (res && res.students) {
       attStudentsList = res.students;
       res.students.forEach((st) => {
-        attStateMap.set(st.student_id, {
+        const sId = st.student_id || st.id;
+        attStateMap.set(sId, {
           status: st.status || "present",
           late_minutes: st.late_minutes || null
         });
       });
     }
 
+    isAttDirty = false;
     renderAttendanceList();
   } catch (e) {
     console.warn("Davomatni yuklashda xato:", e);
   } finally {
     attendanceLoaderEl?.classList.add("hidden");
     updateWindowStatusUI();
+    syncSaveBarForCurrentScreen();
   }
 }
 
@@ -1834,17 +2253,19 @@ function renderAttendanceList() {
   const isWindowOpen = isLessonWindowOpen(currentAttLesson) && isToday && !systemStatus.is_weekend;
   const canEdit = isWindowOpen && currentAttIsStarted;
 
-  // Saqlash tugmasini holati
-  if (btnSaveAttendance) {
-    btnSaveAttendance.disabled = !canEdit;
-    if (!canEdit) {
-      btnSaveAttendance.classList.add("is-disabled-window");
-    } else {
-      btnSaveAttendance.classList.remove("is-disabled-window");
-    }
-  }
+  renderClassChips("attClassChips", attStudentsList, attSelectedClass, (cls) => {
+    attSelectedClass = cls;
+    renderAttendanceList();
+  });
 
-  if (!attStudentsList || attStudentsList.length === 0) {
+  const filtered = attStudentsList.filter((st) => {
+    return matchStudentSearchAndClass(st, attSearchQuery, attSelectedClass);
+  });
+
+  const sorted = sortStudentsAlphabetically(filtered);
+  const duplicateNames = getDuplicateNameSet(sorted);
+
+  if (!sorted || sorted.length === 0) {
     const emptyCard = document.createElement("div");
     emptyCard.className = "card empty-card";
     const emptyTitle = document.createElement("div");
@@ -1852,10 +2273,11 @@ function renderAttendanceList() {
     emptyTitle.textContent = "O'quvchilar topilmadi";
     emptyCard.appendChild(emptyTitle);
     attendanceListEl.appendChild(emptyCard);
+    syncSaveBarForCurrentScreen();
     return;
   }
 
-  attStudentsList.forEach((st) => {
+  sorted.forEach((st) => {
     const sId = st.student_id || st.id;
     const card = document.createElement("div");
     card.className = "card student-row-card";
@@ -1864,7 +2286,7 @@ function renderAttendanceList() {
     cardLeft.className = "card-left";
     cardLeft.style.cursor = "pointer";
 
-    const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
+    const studentFullName = formatStudentFullName(st);
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
@@ -1879,10 +2301,16 @@ function renderAttendanceList() {
     title.textContent = studentFullName;
     info.appendChild(title);
 
+    const hasDuplicate = duplicateNames.has(studentFullName.toLowerCase());
     if (st.grade && st.grade.trim() !== "") {
       const subtitle = document.createElement("div");
       subtitle.className = "card-subtitle";
       subtitle.textContent = `Sinf: ${st.grade.trim()}`;
+      info.appendChild(subtitle);
+    } else if (hasDuplicate) {
+      const subtitle = document.createElement("div");
+      subtitle.className = "card-subtitle";
+      subtitle.textContent = "Sinfi yo'q";
       info.appendChild(subtitle);
     }
 
@@ -1946,7 +2374,9 @@ function renderAttendanceList() {
       } else {
         attStateMap.set(sId, { status: "absent", late_minutes: null });
       }
+      isAttDirty = true;
       renderAttendanceList();
+      syncSaveBarForCurrentScreen();
     };
 
     btnLate.onclick = (e) => {
@@ -1966,6 +2396,8 @@ function renderAttendanceList() {
     card.appendChild(actionsWrap);
     attendanceListEl.appendChild(card);
   });
+
+  syncSaveBarForCurrentScreen();
 }
 
 // Kech qoldi Bottom Sheet
@@ -1976,14 +2408,54 @@ const lateAmountInput = document.getElementById("lateAmountInput");
 const btnUnitMinutes = document.getElementById("btnUnitMinutes");
 const btnUnitHours = document.getElementById("btnUnitHours");
 const btnLateCancel = document.getElementById("btnLateCancel");
+const btnLateConfirm = document.getElementById("btnLateConfirm");
+const lateInputError = document.getElementById("lateInputError");
 
 let lateCurrentUnit = "minute"; // minute | hour
+
+function validateLateInput() {
+  const valStr = lateAmountInput ? lateAmountInput.value.trim() : "";
+  const num = Number(valStr);
+  const isInt = Number.isInteger(num) && /^\d+$/.test(valStr) && num > 0;
+  let totalMinutes = 0;
+
+  if (lateCurrentUnit === "hour") {
+    totalMinutes = num * 60;
+  } else {
+    totalMinutes = num;
+  }
+
+  const isValid = isInt && totalMinutes >= 1 && totalMinutes <= 600;
+
+  if (lateInputError) {
+    if (!isValid) {
+      lateInputError.classList.remove("hidden");
+      if (!isInt) {
+        lateInputError.textContent = "Faqat musbat butun son kiriting";
+      } else {
+        lateInputError.textContent = "Kech qolish vaqti 1 dan 600 daqiqagacha bo'lishi kerak";
+      }
+    } else {
+      lateInputError.classList.add("hidden");
+    }
+  }
+
+  if (btnLateConfirm) {
+    btnLateConfirm.disabled = !isValid;
+  }
+  return isValid;
+}
+
+lateAmountInput?.addEventListener("input", () => {
+  validateLateInput();
+});
 
 btnUnitMinutes?.addEventListener("click", () => {
   haptic.selection();
   lateCurrentUnit = "minute";
   btnUnitMinutes.classList.add("active");
   btnUnitHours.classList.remove("active");
+  validateLateInput();
 });
 
 btnUnitHours?.addEventListener("click", () => {
@@ -1991,6 +2463,7 @@ btnUnitHours?.addEventListener("click", () => {
   lateCurrentUnit = "hour";
   btnUnitHours.classList.add("active");
   btnUnitMinutes.classList.remove("active");
+  validateLateInput();
 });
 
 function openLateArrivalSheet(sId, curState) {
@@ -2015,6 +2488,7 @@ function openLateArrivalSheet(sId, curState) {
     btnUnitHours?.classList.remove("active");
   }
 
+  validateLateInput();
   sheetLateArrival?.classList.remove("hidden");
   updateBackButton();
 }
@@ -2024,42 +2498,33 @@ btnLateCancel?.addEventListener("click", () => {
   const sId = parseInt(lateStudentId.value, 10);
   if (sId) {
     attStateMap.set(sId, { status: "present", late_minutes: null });
+    isAttDirty = true;
   }
   sheetLateArrival?.classList.add("hidden");
   updateBackButton();
   renderAttendanceList();
+  syncSaveBarForCurrentScreen();
 });
 
 formLateArrival?.addEventListener("submit", (e) => {
   e.preventDefault();
   haptic.impact("medium");
 
+  if (!validateLateInput()) return;
+
   const sId = parseInt(lateStudentId.value, 10);
   let amount = parseInt(lateAmountInput.value.trim(), 10);
-
-  if (isNaN(amount) || amount <= 0) {
-    showToast("Miqdor musbat butun son bo'lishi kerak", "error");
-    return;
-  }
-
-  let totalMinutes = amount;
-  if (lateCurrentUnit === "hour") {
-    totalMinutes = amount * 60;
-  }
-
-  if (totalMinutes < 1 || totalMinutes > 600) {
-    showToast("Kech qolish 1 dan 600 daqiqagacha bo'lishi kerak", "error");
-    return;
-  }
+  let totalMinutes = lateCurrentUnit === "hour" ? amount * 60 : amount;
 
   attStateMap.set(sId, { status: "late", late_minutes: totalMinutes });
+  isAttDirty = true;
   sheetLateArrival?.classList.add("hidden");
   updateBackButton();
   renderAttendanceList();
+  syncSaveBarForCurrentScreen();
 });
 
-// Davomat: Katta qizil Saqlash tugmasi
-btnSaveAttendance?.addEventListener("click", async () => {
+async function executeSaveAttendance() {
   const isToday = currentAttDate === getTodayString();
   const isWindowOpen = isLessonWindowOpen(currentAttLesson) && isToday && !systemStatus.is_weekend;
 
@@ -2069,12 +2534,6 @@ btnSaveAttendance?.addEventListener("click", async () => {
   }
 
   haptic.impact("medium");
-  const btnText = document.getElementById("btnSaveAttendanceText");
-  const origText = btnText ? btnText.textContent : "Saqlash";
-
-  btnSaveAttendance.disabled = true;
-  if (btnText) btnText.textContent = "Saqlanmoqda...";
-
   const absent_ids = [];
   const late = [];
 
@@ -2102,15 +2561,17 @@ btnSaveAttendance?.addEventListener("click", async () => {
       body: JSON.stringify(payload)
     });
 
+    isAttDirty = false;
     haptic.notification("success");
     showToast("Davomat muvaffaqiyatli saqlandi", "success");
     await loadAttendance();
   } catch (err) {
-  } finally {
-    btnSaveAttendance.disabled = false;
-    if (btnText) btnText.textContent = origText;
+    if (err.message && (err.message.includes("yopiq") || err.message.includes("403") || err.message.includes("taqiqlangan"))) {
+      await fetchStatus();
+      syncSaveBarForCurrentScreen();
+    }
   }
-});
+}
 
 // ====================================================
 // 4. BAHOLASH BO'LIMI: DARS BAHOSI VA IMTIHON (+, −)
@@ -2143,39 +2604,49 @@ const gradeLessonTopicText = document.getElementById("gradeLessonTopicText");
 const gradeTopicWarningBanner = document.getElementById("gradeTopicWarningBanner");
 const btnSaveGrades = document.getElementById("btnSaveGrades");
 
-document.getElementById("btnGradeLesson1")?.addEventListener("click", () => {
+document.getElementById("btnGradeLesson1")?.addEventListener("click", async () => {
   if (currentGradeLesson === 1) return;
+  const canLeave = await confirmDiscardChangesIfNeeded();
+  if (!canLeave) return;
   haptic.selection();
   currentGradeLesson = 1;
   document.getElementById("btnGradeLesson1")?.classList.add("active");
   document.getElementById("btnGradeLesson2")?.classList.remove("active");
   updateWindowStatusUI();
-  loadGrades();
+  await loadGrades();
 });
 
-document.getElementById("btnGradeLesson2")?.addEventListener("click", () => {
+document.getElementById("btnGradeLesson2")?.addEventListener("click", async () => {
   if (currentGradeLesson === 2) return;
+  const canLeave = await confirmDiscardChangesIfNeeded();
+  if (!canLeave) return;
   haptic.selection();
   currentGradeLesson = 2;
   document.getElementById("btnGradeLesson2")?.classList.add("active");
   document.getElementById("btnGradeLesson1")?.classList.remove("active");
   updateWindowStatusUI();
-  loadGrades();
+  await loadGrades();
 });
 
-document.getElementById("btnGradeKindDaily")?.addEventListener("click", () => {
+document.getElementById("btnGradeKindDaily")?.addEventListener("click", async () => {
   if (currentGradeKind === "daily") return;
+  const canLeave = await confirmDiscardChangesIfNeeded();
+  if (!canLeave) return;
   haptic.selection();
   currentGradeKind = "daily";
   document.getElementById("btnGradeKindDaily")?.classList.add("active");
   document.getElementById("btnGradeKindExam")?.classList.remove("active");
   gradesDailyContainer?.classList.remove("hidden");
   gradesExamContainer?.classList.add("hidden");
-  loadGrades();
+  fabAddExam?.classList.add("hidden");
+  await loadGrades();
+  syncSaveBarForCurrentScreen();
 });
 
-document.getElementById("btnGradeKindExam")?.addEventListener("click", () => {
+document.getElementById("btnGradeKindExam")?.addEventListener("click", async () => {
   if (currentGradeKind === "exam") return;
+  const canLeave = await confirmDiscardChangesIfNeeded();
+  if (!canLeave) return;
   haptic.selection();
   currentGradeKind = "exam";
   document.getElementById("btnGradeKindExam")?.classList.add("active");
@@ -2183,15 +2654,92 @@ document.getElementById("btnGradeKindExam")?.addEventListener("click", () => {
   gradesDailyContainer?.classList.add("hidden");
   gradesExamContainer?.classList.remove("hidden");
   selectedExam = null;
-  loadExamsList();
+  fabAddExam?.classList.remove("hidden");
+  await loadExamsList();
+  syncSaveBarForCurrentScreen();
 });
 
-function renderGradesCalendar() {
-  if (!gradeCalendarGridEl) return;
-  gradeCalendarGridEl.replaceChildren();
+const WEEKDAYS_5 = ["Du", "Se", "Chor", "Pay", "Ju"];
 
-  if (gradeCalMonthTitleEl) {
-    gradeCalMonthTitleEl.textContent = `${MONTH_NAMES_UZ[currentGradeCalMonth]} ${currentGradeCalYear}`;
+function getMondayOfDate(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(date.setDate(diff));
+}
+
+function formatDateToISO(dt) {
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function renderGradesWeekStrip() {
+  const container = document.getElementById("gradeWeekStripDays");
+  if (!container) return;
+  container.replaceChildren();
+
+  const [y, m, d] = currentGradeDate.split("-").map(Number);
+  const curr = new Date(y, m - 1, d);
+  const monday = getMondayOfDate(curr);
+
+  const monthTitleEl = document.getElementById("gradeCalMonthTitle");
+  if (monthTitleEl) {
+    const monthIdx = monday.getMonth();
+    const yearNum = monday.getFullYear();
+    monthTitleEl.textContent = `${MONTH_NAMES_UZ[monthIdx]} ${yearNum}`;
+  }
+
+  for (let i = 0; i < 5; i++) {
+    const dayDate = new Date(monday);
+    dayDate.setDate(monday.getDate() + i);
+    const fullDate = formatDateToISO(dayDate);
+
+    const dayEl = document.createElement("div");
+    dayEl.className = "week-strip-day";
+    if (fullDate === currentGradeDate) {
+      dayEl.classList.add("active");
+    }
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "day-name";
+    nameEl.textContent = WEEKDAYS_5[i];
+
+    const numEl = document.createElement("div");
+    numEl.className = "day-num";
+    numEl.textContent = String(dayDate.getDate());
+
+    dayEl.appendChild(nameEl);
+    dayEl.appendChild(numEl);
+
+    dayEl.onclick = async () => {
+      if (fullDate === currentGradeDate) return;
+      const canLeave = await confirmDiscardChangesIfNeeded();
+      if (!canLeave) return;
+      haptic.selection();
+      currentGradeDate = fullDate;
+      renderGradesWeekStrip();
+      if (currentGradeKind === "daily") {
+        await loadGrades();
+      } else {
+        selectedExam = null;
+        await loadExamsList();
+      }
+    };
+
+    container.appendChild(dayEl);
+  }
+}
+
+function renderSheetMonthCalendar() {
+  const gridEl = document.getElementById("gradeCalendarGrid");
+  if (!gridEl) return;
+  gridEl.replaceChildren();
+
+  const titleEl = document.getElementById("sheetCalMonthTitle");
+  if (titleEl) {
+    titleEl.textContent = `${MONTH_NAMES_UZ[currentGradeCalMonth]} ${currentGradeCalYear}`;
   }
 
   const firstDay = new Date(currentGradeCalYear, currentGradeCalMonth, 1).getDay();
@@ -2201,7 +2749,7 @@ function renderGradesCalendar() {
   for (let i = 0; i < startingDay; i++) {
     const emptySlot = document.createElement("div");
     emptySlot.className = "cal-day empty";
-    gradeCalendarGridEl.appendChild(emptySlot);
+    gridEl.appendChild(emptySlot);
   }
 
   const todayStr = getTodayString();
@@ -2211,54 +2759,148 @@ function renderGradesCalendar() {
     const dStr = String(day).padStart(2, "0");
     const fullDate = `${currentGradeCalYear}-${mStr}-${dStr}`;
 
+    const dateObj = new Date(currentGradeCalYear, currentGradeCalMonth, day);
+    const dayOfWeek = dateObj.getDay();
+    const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
+
     const dayEl = document.createElement("div");
     dayEl.className = "cal-day";
     dayEl.textContent = String(day);
 
-    if (fullDate === todayStr) {
-      dayEl.classList.add("today");
-    }
-    if (fullDate === currentGradeDate) {
-      dayEl.classList.add("selected");
-    }
-
-    dayEl.onclick = () => {
-      haptic.selection();
-      currentGradeDate = fullDate;
-      renderGradesCalendar();
-      if (currentGradeKind === "daily") {
-        loadGrades();
-      } else {
-        selectedExam = null;
-        loadExamsList();
+    if (isWeekendDay) {
+      dayEl.classList.add("disabled");
+      dayEl.style.opacity = "0.35";
+      dayEl.style.cursor = "not-allowed";
+    } else {
+      if (fullDate === todayStr) {
+        dayEl.classList.add("today");
       }
-    };
+      if (fullDate === currentGradeDate) {
+        dayEl.classList.add("selected");
+      }
 
-    gradeCalendarGridEl.appendChild(dayEl);
+      dayEl.onclick = async () => {
+        const canLeave = await confirmDiscardChangesIfNeeded();
+        if (!canLeave) return;
+        haptic.selection();
+        currentGradeDate = fullDate;
+        closeSheetMonthCalendar();
+        renderGradesWeekStrip();
+        if (currentGradeKind === "daily") {
+          await loadGrades();
+        } else {
+          selectedExam = null;
+          await loadExamsList();
+        }
+      };
+    }
+
+    gridEl.appendChild(dayEl);
   }
 }
 
-document.getElementById("btnGradeCalPrev")?.addEventListener("click", () => {
+function openSheetMonthCalendar() {
+  const [y, m] = currentGradeDate.split("-").map(Number);
+  currentGradeCalYear = y;
+  currentGradeCalMonth = m - 1;
+  renderSheetMonthCalendar();
+  document.getElementById("sheetMonthCalendar")?.classList.remove("hidden");
+  updateBackButton();
+}
+
+function closeSheetMonthCalendar() {
+  document.getElementById("sheetMonthCalendar")?.classList.add("hidden");
+  updateBackButton();
+}
+
+document.getElementById("btnGradeWeekPrev")?.addEventListener("click", async () => {
+  const canLeave = await confirmDiscardChangesIfNeeded();
+  if (!canLeave) return;
+  haptic.impact("light");
+  const [y, m, d] = currentGradeDate.split("-").map(Number);
+  const dt = new Date(y, m - 1, d - 7);
+  currentGradeDate = formatDateToISO(dt);
+  renderGradesWeekStrip();
+  if (currentGradeKind === "daily") {
+    await loadGrades();
+  } else {
+    selectedExam = null;
+    await loadExamsList();
+  }
+});
+
+document.getElementById("btnGradeWeekNext")?.addEventListener("click", async () => {
+  const canLeave = await confirmDiscardChangesIfNeeded();
+  if (!canLeave) return;
+  haptic.impact("light");
+  const [y, m, d] = currentGradeDate.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + 7);
+  currentGradeDate = formatDateToISO(dt);
+  renderGradesWeekStrip();
+  if (currentGradeKind === "daily") {
+    await loadGrades();
+  } else {
+    selectedExam = null;
+    await loadExamsList();
+  }
+});
+
+document.getElementById("btnOpenMonthPicker")?.addEventListener("click", () => {
+  haptic.impact("light");
+  openSheetMonthCalendar();
+});
+
+document.getElementById("btnSheetCalPrev")?.addEventListener("click", () => {
   haptic.impact("light");
   currentGradeCalMonth--;
   if (currentGradeCalMonth < 0) {
     currentGradeCalMonth = 11;
     currentGradeCalYear--;
   }
-  renderGradesCalendar();
+  renderSheetMonthCalendar();
 });
 
-document.getElementById("btnGradeCalNext")?.addEventListener("click", () => {
+document.getElementById("btnSheetCalNext")?.addEventListener("click", () => {
   haptic.impact("light");
   currentGradeCalMonth++;
   if (currentGradeCalMonth > 11) {
     currentGradeCalMonth = 0;
     currentGradeCalYear++;
   }
-  renderGradesCalendar();
+  renderSheetMonthCalendar();
 });
 
+// Backward-compatible alias
+const renderGradesCalendar = renderGradesWeekStrip;
+
 // Dars baholarini yuklash
+let dailyGradeSearchQuery = "";
+let dailyGradeSelectedClass = "all";
+const dailyGradeSearchInput = document.getElementById("dailyGradeSearchInput");
+const btnClearDailyGradeSearch = document.getElementById("btnClearDailyGradeSearch");
+let dailyGradeSearchDebounce = null;
+
+dailyGradeSearchInput?.addEventListener("input", () => {
+  if (dailyGradeSearchInput.value.length > 0) {
+    btnClearDailyGradeSearch?.classList.remove("hidden");
+  } else {
+    btnClearDailyGradeSearch?.classList.add("hidden");
+  }
+  clearTimeout(dailyGradeSearchDebounce);
+  dailyGradeSearchDebounce = setTimeout(() => {
+    dailyGradeSearchQuery = dailyGradeSearchInput.value.trim();
+    renderDailyGradesList();
+  }, 250);
+});
+
+btnClearDailyGradeSearch?.addEventListener("click", () => {
+  haptic.impact("light");
+  dailyGradeSearchInput.value = "";
+  btnClearDailyGradeSearch.classList.add("hidden");
+  dailyGradeSearchQuery = "";
+  renderDailyGradesList();
+});
+
 async function loadGrades() {
   gradesLoaderEl?.classList.remove("hidden");
   if (gradeSelectedDateTitleEl) {
@@ -2269,10 +2911,19 @@ async function loadGrades() {
     const endpoint = `/api/grades?date=${currentGradeDate}&lesson=${currentGradeLesson}&kind=daily`;
     const res = await apiRequest(endpoint);
 
-    dailyGradesMap.clear();
-
-    currentGradeIsStarted = Boolean(res?.is_started);
-    currentGradeTopic = res?.topic || "";
+    try {
+      const lessonRes = await apiRequest(`/api/lessons?date=${currentGradeDate}&lesson=${currentGradeLesson}`);
+      if (lessonRes && lessonRes.topic) {
+        currentGradeIsStarted = true;
+        currentGradeTopic = lessonRes.topic;
+      } else {
+        currentGradeIsStarted = false;
+        currentGradeTopic = "";
+      }
+    } catch (_) {
+      currentGradeIsStarted = false;
+      currentGradeTopic = "";
+    }
 
     if (currentGradeIsStarted && currentGradeTopic) {
       gradeLessonTopicText.textContent = currentGradeTopic;
@@ -2282,19 +2933,28 @@ async function loadGrades() {
       gradeTopicWarningBanner.classList.remove("hidden");
     }
 
-    dailyStudentsList = res?.items || [];
-    dailyStudentsList.forEach((st) => {
-      if (st.value !== null && st.value !== undefined) {
-        dailyGradesMap.set(st.student_id, st.value);
-      }
-    });
+    const rawItems = Array.isArray(res) ? res : (res?.items || []);
+    dailyStudentsList = rawItems.map((st) => ({
+      student_id: st.student_id,
+      first_name: st.first_name,
+      last_name: st.last_name || "",
+      grade: st.grade || "",
+      student_name: formatStudentFullName(st),
+      status: st.status || "absent",
+      value: st.value || null,
+      late_minutes: st.late_minutes || null,
+      late_formatted: st.late_formatted || (st.late_minutes ? formatLateMinutes(st.late_minutes) : ""),
+      is_manual_present: st.status === "present" && !st.value
+    }));
 
+    isGradeDailyDirty = false;
     renderDailyGradesList();
   } catch (e) {
     console.warn("Baholarni yuklashda xato:", e);
   } finally {
     gradesLoaderEl?.classList.add("hidden");
     updateWindowStatusUI();
+    syncSaveBarForCurrentScreen();
   }
 }
 
@@ -2302,26 +2962,31 @@ function renderDailyGradesList() {
   gradesListEl.replaceChildren();
 
   const total = dailyStudentsList ? dailyStudentsList.length : 0;
-  const gradedCount = dailyGradesMap.size;
+  const presentCount = dailyStudentsList
+    ? dailyStudentsList.filter((s) => s.status === "present" || s.status === "late").length
+    : 0;
 
   if (gradeSummaryStatEl) {
-    gradeSummaryStatEl.textContent = `Baholangan: ${gradedCount} / ${total}`;
+    gradeSummaryStatEl.textContent = `Keldi: ${presentCount} / ${total}`;
   }
 
   const isToday = currentGradeDate === getTodayString();
   const isWindowOpen = isLessonWindowOpen(currentGradeLesson) && isToday && !systemStatus.is_weekend;
   const canEdit = isWindowOpen && currentGradeIsStarted;
 
-  if (btnSaveGrades) {
-    btnSaveGrades.disabled = !canEdit;
-    if (!canEdit) {
-      btnSaveGrades.classList.add("is-disabled-window");
-    } else {
-      btnSaveGrades.classList.remove("is-disabled-window");
-    }
-  }
+  renderClassChips("dailyGradeClassChips", dailyStudentsList, dailyGradeSelectedClass, (cls) => {
+    dailyGradeSelectedClass = cls;
+    renderDailyGradesList();
+  });
 
-  if (!dailyStudentsList || dailyStudentsList.length === 0) {
+  const filtered = dailyStudentsList.filter((st) => {
+    return matchStudentSearchAndClass(st, dailyGradeSearchQuery, dailyGradeSelectedClass);
+  });
+
+  const sorted = sortStudentsAlphabetically(filtered);
+  const duplicateNames = getDuplicateNameSet(sorted);
+
+  if (!sorted || sorted.length === 0) {
     const emptyCard = document.createElement("div");
     emptyCard.className = "card empty-card";
     const emptyTitle = document.createElement("div");
@@ -2329,10 +2994,11 @@ function renderDailyGradesList() {
     emptyTitle.textContent = "O'quvchilar topilmadi";
     emptyCard.appendChild(emptyTitle);
     gradesListEl.appendChild(emptyCard);
+    syncSaveBarForCurrentScreen();
     return;
   }
 
-  dailyStudentsList.forEach((st) => {
+  sorted.forEach((st) => {
     const sId = st.student_id;
     const card = document.createElement("div");
     card.className = "card student-row-card";
@@ -2341,7 +3007,7 @@ function renderDailyGradesList() {
     cardLeft.className = "card-left";
     cardLeft.style.cursor = "pointer";
 
-    const studentFullName = `${st.first_name || ""} ${st.last_name || ""}`.trim();
+    const studentFullName = st.student_name;
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
@@ -2356,17 +3022,24 @@ function renderDailyGradesList() {
     title.textContent = studentFullName;
     info.appendChild(title);
 
+    const hasDuplicate = duplicateNames.has(studentFullName.toLowerCase());
     if (st.grade && st.grade.trim() !== "") {
       const subtitle = document.createElement("div");
       subtitle.className = "card-subtitle";
       subtitle.textContent = `Sinf: ${st.grade.trim()}`;
+      info.appendChild(subtitle);
+    } else if (hasDuplicate) {
+      const subtitle = document.createElement("div");
+      subtitle.className = "card-subtitle";
+      subtitle.textContent = "Sinfi yo'q";
       info.appendChild(subtitle);
     }
 
     cardLeft.appendChild(avatar);
     cardLeft.appendChild(info);
 
-    cardLeft.onclick = () => {
+    cardLeft.onclick = (e) => {
+      e.stopPropagation();
       haptic.impact("light");
       openStudentProfile({
         id: sId,
@@ -2376,73 +3049,279 @@ function renderDailyGradesList() {
       });
     };
 
-    const curVal = dailyGradesMap.get(sId);
-    const chip = document.createElement("div");
-    chip.className = `chip-grade-badge ${curVal ? "" : "empty"}`;
-    chip.textContent = curVal ? String(curVal) : "-";
+    // Right side: status chip and grade chip
+    const chipsWrap = document.createElement("div");
+    chipsWrap.className = "row-chips-wrap";
+    chipsWrap.style.display = "flex";
+    chipsWrap.style.alignItems = "center";
+    chipsWrap.style.gap = "8px";
 
-    chip.onclick = () => {
+    const statusChip = document.createElement("span");
+    statusChip.className = `student-status-chip ${st.status}`;
+    if (st.status === "present") {
+      statusChip.textContent = "Keldi";
+    } else if (st.status === "late") {
+      statusChip.textContent = st.late_formatted || formatLateMinutes(st.late_minutes) || "Kech qoldi";
+    } else {
+      statusChip.textContent = "Kelmadi";
+    }
+
+    const gradeChip = document.createElement("span");
+    gradeChip.className = `chip-grade-badge ${st.value ? "" : "empty"}`;
+    gradeChip.textContent = st.value ? String(st.value) : "-";
+
+    chipsWrap.appendChild(statusChip);
+    chipsWrap.appendChild(gradeChip);
+
+    card.appendChild(cardLeft);
+    card.appendChild(chipsWrap);
+
+    card.onclick = () => {
       if (!canEdit) {
-        showToast("Dars oynasi yopiq yoki mavzu kiritilmagan", "error");
+        showToast("Dars oynasi yopiq yoki dars boshlanmagan", "error");
         return;
       }
       haptic.impact("light");
-      openDailyGradePickerSheet(sId, studentFullName, curVal);
+      openDailyGradePickerSheet(st);
     };
 
-    card.appendChild(cardLeft);
-    card.appendChild(chip);
     gradesListEl.appendChild(card);
   });
+
+  syncSaveBarForCurrentScreen();
 }
 
-// Kundalik baho sheet
+// Kundalik baho va davomat sheet
 const sheetDailyGradePicker = document.getElementById("sheetDailyGradePicker");
 const sheetDailyGradeStudentName = document.getElementById("sheetDailyGradeStudentName");
 const btnClearDailyGrade = document.getElementById("btnClearDailyGrade");
-let selectedStudentForDailyGrade = null;
+let editingDailyStudent = null;
+let draftStatus = "absent";
+let draftValue = null;
+let draftLateMinutes = 15;
+let draftIsManualPresent = false;
+let draftLateUnit = "minute";
 
-function openDailyGradePickerSheet(studentId, studentName, curVal) {
-  selectedStudentForDailyGrade = studentId;
-  sheetDailyGradeStudentName.textContent = studentName;
+function openDailyGradePickerSheet(st) {
+  editingDailyStudent = st;
+  draftStatus = st.status || "absent";
+  draftValue = st.value || null;
+  draftLateMinutes = st.late_minutes || 15;
+  draftIsManualPresent = Boolean(st.is_manual_present);
+  draftLateUnit = "minute";
 
-  document.querySelectorAll(".grade-circle-btn[data-val]").forEach((btn) => {
-    const val = parseInt(btn.getAttribute("data-val"), 10);
-    if (val === curVal) {
-      btn.classList.add("active");
-    } else {
-      btn.classList.remove("active");
-    }
-  });
+  if (sheetDailyGradeStudentName) {
+    sheetDailyGradeStudentName.textContent = st.student_name;
+  }
 
+  updateDailySheetUI();
   sheetDailyGradePicker?.classList.remove("hidden");
   updateBackButton();
 }
+
+function updateDailySheetUI() {
+  const btnPres = document.getElementById("btnDailyStatusPresent");
+  const btnAbs = document.getElementById("btnDailyStatusAbsent");
+  const btnLate = document.getElementById("btnDailyStatusLate");
+
+  btnPres?.classList.toggle("active", draftStatus === "present");
+  btnAbs?.classList.toggle("active", draftStatus === "absent");
+  btnLate?.classList.toggle("active", draftStatus === "late");
+
+  const lateSec = document.getElementById("dailyLateInputSection");
+  const lateInput = document.getElementById("dailyLateAmountInput");
+  const lateErr = document.getElementById("dailyLateInputError");
+  if (lateErr) lateErr.classList.add("hidden");
+
+  if (draftStatus === "late") {
+    lateSec?.classList.remove("hidden");
+    if (lateInput) {
+      if (draftLateUnit === "hour") {
+        lateInput.value = String(Math.max(1, Math.round(draftLateMinutes / 60)));
+      } else {
+        lateInput.value = String(draftLateMinutes || 15);
+      }
+    }
+  } else {
+    lateSec?.classList.add("hidden");
+  }
+
+  const btnMin = document.getElementById("btnDailyUnitMinutes");
+  const btnHour = document.getElementById("btnDailyUnitHours");
+  btnMin?.classList.toggle("active", draftLateUnit === "minute");
+  btnHour?.classList.toggle("active", draftLateUnit === "hour");
+
+  document.querySelectorAll(".grade-circle-btn[data-val]").forEach((btn) => {
+    const val = parseInt(btn.getAttribute("data-val"), 10);
+    btn.classList.toggle("active", draftValue === val);
+  });
+
+  if (btnClearDailyGrade) {
+    if (draftValue !== null && draftValue !== undefined) {
+      btnClearDailyGrade.classList.remove("hidden");
+    } else {
+      btnClearDailyGrade.classList.add("hidden");
+    }
+  }
+}
+
+document.getElementById("btnDailyStatusPresent")?.addEventListener("click", () => {
+  haptic.selection();
+  draftStatus = "present";
+  draftIsManualPresent = true;
+  updateDailySheetUI();
+});
+
+document.getElementById("btnDailyStatusAbsent")?.addEventListener("click", () => {
+  haptic.selection();
+  draftStatus = "absent";
+  draftIsManualPresent = false;
+  draftValue = null;
+  draftLateMinutes = null;
+  updateDailySheetUI();
+});
+
+document.getElementById("btnDailyStatusLate")?.addEventListener("click", () => {
+  haptic.selection();
+  draftStatus = "late";
+  draftIsManualPresent = false;
+  if (!draftLateMinutes) draftLateMinutes = 15;
+  updateDailySheetUI();
+});
+
+document.getElementById("btnDailyUnitMinutes")?.addEventListener("click", () => {
+  haptic.selection();
+  draftLateUnit = "minute";
+  updateDailySheetUI();
+});
+
+document.getElementById("btnDailyUnitHours")?.addEventListener("click", () => {
+  haptic.selection();
+  draftLateUnit = "hour";
+  updateDailySheetUI();
+});
 
 document.querySelectorAll(".grade-circle-btn[data-val]").forEach((btn) => {
   btn.onclick = () => {
     haptic.selection();
     const val = parseInt(btn.getAttribute("data-val"), 10);
-    if (selectedStudentForDailyGrade) {
-      dailyGradesMap.set(selectedStudentForDailyGrade, val);
+    if (draftStatus === "absent") {
+      draftStatus = "present";
+      draftIsManualPresent = false;
     }
-    sheetDailyGradePicker?.classList.add("hidden");
-    updateBackButton();
-    renderDailyGradesList();
+    draftValue = val;
+    updateDailySheetUI();
   };
 });
 
 btnClearDailyGrade?.addEventListener("click", () => {
   haptic.impact("light");
-  if (selectedStudentForDailyGrade) {
-    dailyGradesMap.delete(selectedStudentForDailyGrade);
+  draftValue = null;
+  if (draftStatus === "present" && !draftIsManualPresent) {
+    draftStatus = "absent";
   }
-  sheetDailyGradePicker?.classList.add("hidden");
-  updateBackButton();
-  renderDailyGradesList();
+  updateDailySheetUI();
 });
 
+document.getElementById("btnSaveDailyStudent")?.addEventListener("click", () => {
+  if (draftStatus === "late") {
+    const input = document.getElementById("dailyLateAmountInput");
+    const raw = parseInt(input?.value || "0", 10);
+    const mins = draftLateUnit === "hour" ? raw * 60 : raw;
+    const err = document.getElementById("dailyLateInputError");
+    if (isNaN(mins) || mins < 1 || mins > 600) {
+      if (err) err.classList.remove("hidden");
+      return;
+    }
+    if (err) err.classList.add("hidden");
+    draftLateMinutes = mins;
+  }
+
+  if (editingDailyStudent) {
+    editingDailyStudent.status = draftStatus;
+    editingDailyStudent.value = draftValue;
+    editingDailyStudent.late_minutes = draftStatus === "late" ? draftLateMinutes : null;
+    editingDailyStudent.late_formatted = draftStatus === "late" ? formatLateMinutes(draftLateMinutes) : null;
+    editingDailyStudent.is_manual_present = draftIsManualPresent;
+
+    isGradeDailyDirty = true;
+    renderDailyGradesList();
+    syncSaveBarForCurrentScreen();
+  }
+
+  sheetDailyGradePicker?.classList.add("hidden");
+  updateBackButton();
+});
+
+async function executeSaveDailyGrades() {
+  const isToday = currentGradeDate === getTodayString();
+  const isWindowOpen = isLessonWindowOpen(currentGradeLesson) && isToday && !systemStatus.is_weekend;
+
+  if (!isWindowOpen || !currentGradeIsStarted) {
+    showToast("Dars oynasi yopiq yoki mavzu kiritilmagan", "error");
+    return;
+  }
+
+  haptic.impact("medium");
+  const items = dailyStudentsList.map((st) => ({
+    student_id: st.student_id,
+    status: st.status || "absent",
+    value: st.value || null,
+    late_minutes: st.status === "late" ? (st.late_minutes || 15) : null
+  }));
+
+  try {
+    await apiRequest("/api/grades", {
+      method: "PUT",
+      body: JSON.stringify({
+        date: currentGradeDate,
+        lesson: currentGradeLesson,
+        kind: "daily",
+        items
+      })
+    });
+
+    isGradeDailyDirty = false;
+    haptic.notification("success");
+    showToast("Dars baholari muvaffaqiyatli saqlandi", "success");
+    await loadGrades();
+    loadHomeDashboard();
+  } catch (err) {
+    if (err.message && (err.message.includes("yopiq") || err.message.includes("403") || err.message.includes("taqiqlangan"))) {
+      await fetchStatus();
+      syncSaveBarForCurrentScreen();
+    }
+  }
+}
+
 // Imtihonlar ro'yxati va imtihon baholash
+let examGradeSearchQuery = "";
+let examGradeSelectedClass = "all";
+const examGradeSearchInput = document.getElementById("examGradeSearchInput");
+const btnClearExamGradeSearch = document.getElementById("btnClearExamGradeSearch");
+let examGradeSearchDebounce = null;
+
+examGradeSearchInput?.addEventListener("input", () => {
+  if (examGradeSearchInput.value.length > 0) {
+    btnClearExamGradeSearch?.classList.remove("hidden");
+  } else {
+    btnClearExamGradeSearch?.classList.add("hidden");
+  }
+  clearTimeout(examGradeSearchDebounce);
+  examGradeSearchDebounce = setTimeout(() => {
+    examGradeSearchQuery = examGradeSearchInput.value.trim();
+    renderSelectedExamGrades();
+  }, 250);
+});
+
+btnClearExamGradeSearch?.addEventListener("click", () => {
+  haptic.impact("light");
+  examGradeSearchInput.value = "";
+  btnClearExamGradeSearch.classList.add("hidden");
+  examGradeSearchQuery = "";
+  renderSelectedExamGrades();
+});
+
 async function loadExamsList() {
   gradesLoaderEl?.classList.remove("hidden");
   if (gradeSelectedDateTitleEl) {
@@ -2458,21 +3337,22 @@ async function loadExamsList() {
   } finally {
     gradesLoaderEl?.classList.add("hidden");
     updateWindowStatusUI();
+    syncSaveBarForCurrentScreen();
   }
 }
 
 function renderExamsUI() {
-  examsListEl.replaceChildren();
+  const examsListEl = document.getElementById("examsList");
+  const selectedExamContainer = document.getElementById("selectedExamContainer");
 
-  // Agar imtihon tanlanmagan bo'lsa: imtihonlar ro'yxati
   if (!selectedExam) {
+    examsListEl?.classList.remove("hidden");
+    selectedExamContainer?.classList.add("hidden");
+    fabAddExam?.classList.remove("hidden");
+    examsListEl.replaceChildren();
+
     if (gradeSummaryStatEl) {
       gradeSummaryStatEl.textContent = `Imtihonlar: ${todayExamsList.length} ta`;
-    }
-
-    if (btnSaveGrades) {
-      btnSaveGrades.disabled = true;
-      btnSaveGrades.classList.add("is-disabled-window");
     }
 
     if (todayExamsList.length === 0) {
@@ -2483,6 +3363,7 @@ function renderExamsUI() {
       emptyTitle.textContent = "Ushbu kunda imtihon ochilmagan";
       emptyCard.appendChild(emptyTitle);
       examsListEl.appendChild(emptyCard);
+      syncSaveBarForCurrentScreen();
       return;
     }
 
@@ -2519,8 +3400,11 @@ function renderExamsUI() {
 
       examsListEl.appendChild(card);
     });
+    syncSaveBarForCurrentScreen();
   } else {
-    // Tanlangan imtihon bo'yicha o'quvchilar ro'yxati
+    examsListEl?.classList.add("hidden");
+    selectedExamContainer?.classList.remove("hidden");
+    fabAddExam?.classList.add("hidden");
     renderSelectedExamGrades();
   }
 }
@@ -2534,27 +3418,35 @@ async function loadExamGrades(examId) {
     if (grades && Array.isArray(grades)) {
       grades.forEach((g) => {
         examGradesMap.set(g.student_id, {
+          student_id: g.student_id,
           name: g.student_name,
+          first_name: g.first_name || "",
+          last_name: g.last_name || "",
+          grade: g.grade,
           value: g.value,
           modifier: g.modifier
         });
       });
     }
 
-    renderSelectedExamGrades();
+    isGradeExamDirty = false;
+    renderExamsUI();
   } catch (err) {
   } finally {
     gradesLoaderEl?.classList.add("hidden");
+    syncSaveBarForCurrentScreen();
   }
 }
 
 function renderSelectedExamGrades() {
-  examsListEl.replaceChildren();
+  const selectedExamContainer = document.getElementById("selectedExamContainer");
+  const selectedExamHeader = document.getElementById("selectedExamHeader");
+  const selectedExamGradesList = document.getElementById("selectedExamGradesList");
 
-  // Imtihon headeri va Orqaga tugmasi
-  const headerCard = document.createElement("div");
-  headerCard.className = "card teacher-exam-card";
-  headerCard.style.marginBottom = "12px";
+  if (!selectedExam || !selectedExamContainer || !selectedExamHeader || !selectedExamGradesList) return;
+
+  selectedExamHeader.replaceChildren();
+  selectedExamGradesList.replaceChildren();
 
   const topRow = document.createElement("div");
   topRow.className = "lesson-card-top";
@@ -2568,10 +3460,14 @@ function renderSelectedExamGrades() {
   btnBack.style.padding = "4px 10px";
   btnBack.style.fontSize = "12px";
   btnBack.textContent = "Orqaga";
-  btnBack.onclick = () => {
+  btnBack.onclick = async () => {
+    const canLeave = await confirmDiscardChangesIfNeeded();
+    if (!canLeave) return;
     haptic.impact("light");
     selectedExam = null;
-    renderExamsUI();
+    loadExamsList();
+    updateBackButton();
+    syncSaveBarForCurrentScreen();
   };
 
   topRow.appendChild(title);
@@ -2581,9 +3477,8 @@ function renderSelectedExamGrades() {
   sub.className = "teacher-exam-sub";
   sub.textContent = `${selectedExam.lesson_no}-dars | ${selectedExam.topic}`;
 
-  headerCard.appendChild(topRow);
-  headerCard.appendChild(sub);
-  examsListEl.appendChild(headerCard);
+  selectedExamHeader.appendChild(topRow);
+  selectedExamHeader.appendChild(sub);
 
   const isToday = currentGradeDate === getTodayString();
   const isWindowOpen = isLessonWindowOpen(selectedExam.lesson_no) && isToday && !systemStatus.is_weekend;
@@ -2597,16 +3492,34 @@ function renderSelectedExamGrades() {
     gradeSummaryStatEl.textContent = `Baholangan: ${gradedCount} / ${examGradesMap.size}`;
   }
 
-  if (btnSaveGrades) {
-    btnSaveGrades.disabled = !isWindowOpen;
-    if (!isWindowOpen) {
-      btnSaveGrades.classList.add("is-disabled-window");
-    } else {
-      btnSaveGrades.classList.remove("is-disabled-window");
-    }
+  const allExamStudents = Array.from(examGradesMap.values());
+
+  renderClassChips("examGradeClassChips", allExamStudents, examGradeSelectedClass, (cls) => {
+    examGradeSelectedClass = cls;
+    renderSelectedExamGrades();
+  });
+
+  const filtered = allExamStudents.filter((st) => {
+    return matchStudentSearchAndClass(st, examGradeSearchQuery, examGradeSelectedClass);
+  });
+
+  const sorted = sortStudentsAlphabetically(filtered);
+  const duplicateNames = getDuplicateNameSet(sorted);
+
+  if (!sorted || sorted.length === 0) {
+    const emptyCard = document.createElement("div");
+    emptyCard.className = "card empty-card";
+    const emptyTitle = document.createElement("div");
+    emptyTitle.className = "empty-title";
+    emptyTitle.textContent = "O'quvchilar topilmadi";
+    emptyCard.appendChild(emptyTitle);
+    selectedExamGradesList.appendChild(emptyCard);
+    syncSaveBarForCurrentScreen();
+    return;
   }
 
-  examGradesMap.forEach((gradeData, studentId) => {
+  sorted.forEach((gradeData) => {
+    const studentId = gradeData.student_id;
     const card = document.createElement("div");
     card.className = "card student-row-card";
 
@@ -2614,12 +3527,12 @@ function renderSelectedExamGrades() {
     cardLeft.className = "card-left";
     cardLeft.style.cursor = "pointer";
 
-    const studentFullName = gradeData.name || "O'quvchi";
+    const studentFullName = formatStudentFullName(gradeData);
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
     avatar.style.background = getAvatarColor(studentFullName);
-    avatar.textContent = getInitials(studentFullName, "");
+    avatar.textContent = getInitials(gradeData.first_name, gradeData.last_name);
 
     const info = document.createElement("div");
     info.className = "card-info";
@@ -2629,12 +3542,25 @@ function renderSelectedExamGrades() {
     titleDiv.textContent = studentFullName;
     info.appendChild(titleDiv);
 
+    const hasDuplicate = duplicateNames.has(studentFullName.toLowerCase());
+    if (gradeData.grade && String(gradeData.grade).trim() !== "") {
+      const subtitle = document.createElement("div");
+      subtitle.className = "card-subtitle";
+      subtitle.textContent = `Sinf: ${String(gradeData.grade).trim()}`;
+      info.appendChild(subtitle);
+    } else if (hasDuplicate) {
+      const subtitle = document.createElement("div");
+      subtitle.className = "card-subtitle";
+      subtitle.textContent = "Sinfi yo'q";
+      info.appendChild(subtitle);
+    }
+
     cardLeft.appendChild(avatar);
     cardLeft.appendChild(info);
 
     cardLeft.onclick = () => {
       haptic.impact("light");
-      openStudentProfile({ id: studentId, first_name: studentFullName });
+      openStudentProfile({ id: studentId, first_name: gradeData.first_name, last_name: gradeData.last_name, grade: gradeData.grade });
     };
 
     const chip = document.createElement("div");
@@ -2662,8 +3588,49 @@ function renderSelectedExamGrades() {
 
     card.appendChild(cardLeft);
     card.appendChild(chip);
-    examsListEl.appendChild(card);
+    selectedExamGradesList.appendChild(card);
   });
+
+  syncSaveBarForCurrentScreen();
+}
+
+async function executeSaveExamGrades() {
+  const isToday = currentGradeDate === getTodayString();
+  const isWindowOpen = isLessonWindowOpen(selectedExam?.lesson_no) && isToday && !systemStatus.is_weekend;
+
+  if (!isWindowOpen || !selectedExam) {
+    showToast("Dars oynasi yopiq, saqlash taqiqlangan", "error");
+    return;
+  }
+
+  haptic.impact("medium");
+  const items = [];
+  examGradesMap.forEach((g, studentId) => {
+    if (g.value) {
+      items.push({
+        student_id: studentId,
+        value: g.value,
+        modifier: g.modifier || null
+      });
+    }
+  });
+
+  try {
+    await apiRequest(`/api/exams/${selectedExam.id}/grades`, {
+      method: "PUT",
+      body: JSON.stringify({ items })
+    });
+
+    isGradeExamDirty = false;
+    haptic.notification("success");
+    showToast("Imtihon baholari muvaffaqiyatli saqlandi", "success");
+    await loadExamGrades(selectedExam.id);
+  } catch (err) {
+    if (err.message && (err.message.includes("yopiq") || err.message.includes("403") || err.message.includes("taqiqlangan"))) {
+      await fetchStatus();
+      syncSaveBarForCurrentScreen();
+    }
+  }
 }
 
 // Imtihon bahosi va modifikator sheet
@@ -2733,7 +3700,9 @@ document.querySelectorAll(".grade-circle-btn[data-exam-val]").forEach((btn) => {
         value: examPickerSelectedVal,
         modifier: examPickerSelectedMod
       });
+      isGradeExamDirty = true;
       renderSelectedExamGrades();
+      syncSaveBarForCurrentScreen();
     }
   };
 });
@@ -2750,7 +3719,9 @@ btnModMinus?.addEventListener("click", () => {
       value: examPickerSelectedVal,
       modifier: examPickerSelectedMod
     });
+    isGradeExamDirty = true;
     renderSelectedExamGrades();
+    syncSaveBarForCurrentScreen();
   }
 });
 
@@ -2766,7 +3737,9 @@ btnModNone?.addEventListener("click", () => {
       value: examPickerSelectedVal,
       modifier: null
     });
+    isGradeExamDirty = true;
     renderSelectedExamGrades();
+    syncSaveBarForCurrentScreen();
   }
 });
 
@@ -2782,7 +3755,9 @@ btnModPlus?.addEventListener("click", () => {
       value: examPickerSelectedVal,
       modifier: examPickerSelectedMod
     });
+    isGradeExamDirty = true;
     renderSelectedExamGrades();
+    syncSaveBarForCurrentScreen();
   }
 });
 
@@ -2795,75 +3770,12 @@ btnClearExamGrade?.addEventListener("click", () => {
       value: null,
       modifier: null
     });
+    isGradeExamDirty = true;
     renderSelectedExamGrades();
+    syncSaveBarForCurrentScreen();
   }
   sheetExamGradePicker?.classList.add("hidden");
   updateBackButton();
-});
-
-// Baholar Saqlash Tugmasi (Dars bahosi yoki Imtihon)
-btnSaveGrades?.addEventListener("click", async () => {
-  const isToday = currentGradeDate === getTodayString();
-  const isWindowOpen = isLessonWindowOpen(currentGradeKind === "daily" ? currentGradeLesson : selectedExam?.lesson_no) && isToday && !systemStatus.is_weekend;
-
-  if (!isWindowOpen) {
-    showToast("Dars oynasi yopiq, saqlash taqiqlangan", "error");
-    return;
-  }
-
-  haptic.impact("medium");
-  const btnText = document.getElementById("btnSaveGradesText");
-  const origText = btnText ? btnText.textContent : "Saqlash";
-
-  btnSaveGrades.disabled = true;
-  if (btnText) btnText.textContent = "Saqlanmoqda...";
-
-  try {
-    if (currentGradeKind === "daily") {
-      const items = [];
-      dailyGradesMap.forEach((val, studentId) => {
-        items.push({ student_id: studentId, value: val });
-      });
-
-      await apiRequest("/api/grades", {
-        method: "PUT",
-        body: JSON.stringify({
-          date: currentGradeDate,
-          lesson: currentGradeLesson,
-          kind: "daily",
-          items
-        })
-      });
-
-      haptic.notification("success");
-      showToast("Dars baholari muvaffaqiyatli saqlandi", "success");
-      await loadGrades();
-    } else if (currentGradeKind === "exam" && selectedExam) {
-      const items = [];
-      examGradesMap.forEach((g, studentId) => {
-        if (g.value) {
-          items.push({
-            student_id: studentId,
-            value: g.value,
-            modifier: g.modifier || null
-          });
-        }
-      });
-
-      await apiRequest(`/api/exams/${selectedExam.id}/grades`, {
-        method: "PUT",
-        body: JSON.stringify({ items })
-      });
-
-      haptic.notification("success");
-      showToast("Imtihon baholari muvaffaqiyatli saqlandi", "success");
-      await loadExamGrades(selectedExam.id);
-    }
-  } catch (err) {
-  } finally {
-    btnSaveGrades.disabled = false;
-    if (btnText) btnText.textContent = origText;
-  }
 });
 
 // ====================================================
@@ -3046,6 +3958,20 @@ async function loadTeacherProfileData() {
 
         card.appendChild(topRow);
         card.appendChild(sub);
+
+        card.style.cursor = "pointer";
+        card.onclick = async () => {
+          haptic.impact("light");
+          modalTeacherProfile?.classList.add("hidden");
+          updateBackButton();
+          await switchTab("tabGrades");
+          document.getElementById("btnGradeKindExam")?.click();
+          currentGradeDate = ex.date;
+          selectedExam = ex;
+          renderGradesCalendar();
+          await loadExamGrades(ex.id);
+        };
+
         teacherExamsList.appendChild(card);
       });
     }

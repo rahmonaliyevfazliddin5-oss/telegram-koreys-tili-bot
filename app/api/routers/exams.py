@@ -2,7 +2,7 @@ from datetime import date
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, func, desc, delete
 
 from app.database import get_db
 from app.api.deps import get_current_admin
@@ -105,7 +105,7 @@ async def get_exams(
     else:
         target_date = get_tashkent_now().date()
 
-    stmt = select(Exam).where(Exam.date == target_date).order_by(Exam.lesson_no, Exam.id)
+    stmt = select(Exam).where(Exam.date == target_date).order_by(Exam.id.desc())
     res = await db.execute(stmt)
     return list(res.scalars().all())
 
@@ -122,7 +122,10 @@ async def get_exam_grades(
     if not exam:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imtihon topilmadi")
 
-    students_stmt = select(Student).order_by(Student.first_name, Student.last_name)
+    students_stmt = select(Student).order_by(
+        func.coalesce(func.nullif(Student.last_name, ""), Student.first_name).asc(),
+        Student.first_name.asc()
+    )
     students_res = await db.execute(students_stmt)
     students = students_res.scalars().all()
 
@@ -133,10 +136,14 @@ async def get_exam_grades(
     response_items = []
     for s in students:
         g = grades_map.get(s.id)
+        full_name = f"{s.last_name} {s.first_name}".strip() if s.last_name else s.first_name
         response_items.append(
             ExamGradeStudentResponse(
                 student_id=s.id,
-                student_name=f"{s.first_name} {s.last_name}",
+                student_name=full_name,
+                first_name=s.first_name,
+                last_name=s.last_name or "",
+                grade=s.grade,
                 value=g.value if g else None,
                 modifier=g.modifier if g else None
             )
