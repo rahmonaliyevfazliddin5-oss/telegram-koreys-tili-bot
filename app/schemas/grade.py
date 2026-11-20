@@ -1,6 +1,6 @@
 from datetime import date, datetime
-from typing import Optional, List, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, List
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 class GradeItem(BaseModel):
@@ -11,16 +11,23 @@ class GradeItem(BaseModel):
 class GradesBulkUpdate(BaseModel):
     date: date
     lesson: int = Field(1, ge=1, le=2)
-    kind: Literal["daily", "exam"] = "daily"
-    grades: List[GradeItem] = Field(default_factory=list)
+    kind: Optional[str] = "daily"
+    grades: Optional[List[GradeItem]] = None
+    items: Optional[List[GradeItem]] = None
+
+    @model_validator(mode="after")
+    def unify_items(self):
+        if self.items is None:
+            self.items = self.grades or []
+        return self
 
 
 class GradeCreate(BaseModel):
     student_id: int
     date: date
     lesson: int = Field(1, ge=1, le=2)
-    kind: Literal["daily", "exam"] = "daily"
     value: int = Field(..., ge=1, le=5)
+    kind: Optional[str] = "daily"
 
 
 class GradeUpdate(BaseModel):
@@ -28,14 +35,14 @@ class GradeUpdate(BaseModel):
 
 
 class GradeResponse(BaseModel):
-    id: int
+    id: Optional[int] = None
     student_id: int
     date: date
     lesson: int = 1
-    kind: str = "daily"
     value: int
     created_at: datetime
     student_name: Optional[str] = None
+    kind: Optional[str] = "daily"
     model_config = ConfigDict(from_attributes=True)
 
 

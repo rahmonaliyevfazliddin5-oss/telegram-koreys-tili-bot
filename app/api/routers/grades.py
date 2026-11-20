@@ -8,14 +8,15 @@ from app.database import get_db
 from app.api.deps import get_current_admin
 from app.models.grade import Grade
 from app.models.student import Student
+from app.models.lesson import Lesson
 from app.schemas.grade import (
     GradeCreate,
     GradeUpdate,
     GradeResponse,
     GradesBulkUpdate
 )
-from app.services.cache_service import invalidate_rating_cache
-from app.services.time_service import get_tashkent_now, is_lesson_window_open
+from app.services.cache_service import invalidate_all_caches
+from app.services.time_service import get_tashkent_now, is_weekend, is_lesson_window_open
 
 router = APIRouter()
 
@@ -24,57 +25,46 @@ router = APIRouter()
 async def get_grades(
     grade_date: Optional[date] = Query(None, alias="date", description="Baholar sanasi (YYYY-MM-DD)"),
     lesson: Optional[int] = Query(1, ge=1, le=2, description="Dars tartib raqami (1 yoki 2)"),
-    kind: Optional[str] = Query("daily", pattern="^(daily|exam)$", description="Baho turi: daily yoki exam"),
+    kind: Optional[str] = Query("daily", description="Baho turi"),
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_current_admin)
 ):
     """
-    Belgilangan sana, dars va baho turi bo'yicha baholarni qaytaradi.
+    Belgilangan sana va dars bo'yicha kundalik dars baholarini qaytaradi.
     """
     if grade_date is None:
         grade_date = get_tashkent_now().date()
 
-    stmt = (
-        select(
-            Grade.id,
-            Grade.student_id,
-            Grade.date,
-            Grade.lesson,
-            Grade.kind,
-            Grade.value,
-            Grade.created_at,
-            Student.first_name,
-            Student.last_name,
-            Student.grade.label("student_class")
+    # Barcha o'quvchilarni olish
+    students_stmt = select(Student).order_by(Student.last_name.asc(), Student.first_name.asc())
+    students_res = await db.execute(students_stmt)
+    all_students = students_res.scalars().all()
+
+    # Shu sana va dars uchun baholarni olish
+    grades_stmt = select(Grade).where(
+        and_(
+            Grade.date == grade_date,
+            Grade.lesson_no == lesson
         )
-        .join(Student, Grade.student_id == Student.id)
-        .where(
-            and_(
-                Grade.date == grade_date,
-                Grade.lesson == lesson,
-                Grade.kind == kind
-            )
-        )
-        .order_by(Student.last_name.asc(), Student.first_name.asc())
     )
-    result = await db.execute(stmt)
-    rows = result.all()
+    grades_res = await db.execute(grades_stmt)
+    grades_map = {g.student_id: g for g in grades_res.scalars().all()}
 
     return [
         {
-            "id": r.id,
-            "student_id": r.student_id,
-            "date": str(r.date),
-            "lesson": r.lesson,
-            "kind": r.kind,
-            "value": r.value,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-            "first_name": r.first_name,
-            "last_name": r.last_name or "",
-            "grade": r.student_class,
-            "student_name": f"{r.first_name} {r.last_name or ''}".strip()
+            "id": grades_map[s.id].id if s.id in grades_map else None,
+            "student_id": s.id,
+            "date": str(grade_date),
+            "lesson": lesson,
+            "kind": "daily",
+            "value": grades_map[s.id].value if s.id in grades_map else None,
+            "created_at": grades_map[s.id].created_at.isoformat() if (s.id in grades_map and grades_map[s.id].created_at) else None,
+            "first_name": s.first_name,
+            "last_name": s.last_name or "",
+            "grade": s.grade,
+            "student_name": f"{s.first_name} {s.last_name or ''}".strip()
         }
-        for r in rows
+        for s in all_students
     ]
 
 
@@ -90,8 +80,7 @@ async def get_grade(
             Grade.id,
             Grade.student_id,
             Grade.date,
-            Grade.lesson,
-            Grade.kind,
+            Grade.lesson_no,
             Grade.value,
             Grade.created_at,
             (Student.first_name + " " + Student.last_name).label("student_name")
@@ -110,8 +99,7 @@ async def get_grade(
         id=row.id,
         student_id=row.student_id,
         date=row.date,
-        lesson=row.lesson,
-        kind=row.kind,
+        lesson=row.lesson_no,
         value=row.value,
         created_at=row.created_at,
         student_name=row.student_name
@@ -125,22 +113,52 @@ async def bulk_save_grades(
     admin: dict = Depends(get_current_admin)
 ):
     """
-    Ommaviy baholash: berilgan dars va tur bo'yicha o'quvchilar baholarini saqlash.
-    Dars oynasi yopiq bo'lsa 403 Forbidden qaytariladi.
+    Ommaviy baholash: berilgan dars uchun o'quvchilar baholarini saqlash.
+    Faqat bugun, ish kuni, oyna ochiq va dars mavzusi kiritilgan bo'lganda ishlaydi.
     """
-    if not is_lesson_window_open(payload.lesson, target_date=payload.date):
+    now = get_tashkent_now()
+    today = now.date()
+
+    if payload.date != today:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Faqat bugungi kun uchun baho saqlash mumkin"
+        )
+
+    if is_weekend(today):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Dam olish kunida baholash taqiqlangan"
+        )
+
+    if not is_lesson_window_open(payload.lesson, today, now.time()):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Dars oynasi yopiq yoki dam olish kuni"
         )
 
-    for item in payload.grades:
+    # Dars mavzusi tekshiruvi (Dars boshlangan bo'lishi shart!)
+    lesson_stmt = select(Lesson).where(
+        and_(
+            Lesson.date == today,
+            Lesson.lesson_no == payload.lesson
+        )
+    )
+    lesson_res = await db.execute(lesson_stmt)
+    lesson_obj = lesson_res.scalar_one_or_none()
+    if not lesson_obj or not lesson_obj.topic:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Avval dars mavzusini kiriting"
+        )
+
+    items = payload.items or []
+    for item in items:
         stmt = select(Grade).where(
             and_(
                 Grade.student_id == item.student_id,
-                Grade.date == payload.date,
-                Grade.lesson == payload.lesson,
-                Grade.kind == payload.kind
+                Grade.date == today,
+                Grade.lesson_no == payload.lesson
             )
         )
         existing = (await db.execute(stmt)).scalar_one_or_none()
@@ -151,18 +169,18 @@ async def bulk_save_grades(
             else:
                 db.add(Grade(
                     student_id=item.student_id,
-                    date=payload.date,
-                    lesson=payload.lesson,
-                    kind=payload.kind,
-                    value=item.value
+                    date=today,
+                    lesson_no=payload.lesson,
+                    value=item.value,
+                    created_at=now
                 ))
         elif item.value is None or item.value == 0:
             if existing:
                 await db.delete(existing)
 
     await db.commit()
-    await invalidate_rating_cache()
-    return {"ok": True, "count": len(payload.grades)}
+    await invalidate_all_caches()
+    return {"ok": True, "count": len(items)}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -172,120 +190,15 @@ async def create_or_bulk_grades(
     admin: dict = Depends(get_current_admin)
 ):
     """Baho qo'yish (yakka yoki ommaviy)."""
-    if isinstance(payload, GradesBulkUpdate) or hasattr(payload, "grades"):
+    if isinstance(payload, GradesBulkUpdate) or hasattr(payload, "items") or hasattr(payload, "grades"):
+        if isinstance(payload, GradeCreate):
+            # Convert single create to bulk logic
+            bulk_payload = GradesBulkUpdate(
+                date=payload.date,
+                lesson=payload.lesson,
+                items=[GradeItem(student_id=payload.student_id, value=payload.value)]
+            )
+            return await bulk_save_grades(bulk_payload, db=db, admin=admin)
         return await bulk_save_grades(payload, db=db, admin=admin)
 
-    # Yakka baho
-    if not is_lesson_window_open(payload.lesson, target_date=payload.date):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Dars oynasi yopiq yoki dam olish kuni"
-        )
-
-    # O'quvchi mavjudligini tekshirish
-    student = await db.get(Student, payload.student_id)
-    if not student:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="O'quvchi topilmadi"
-        )
-
-    # Mavjud bahoni tekshirish
-    stmt = select(Grade).where(
-        and_(
-            Grade.student_id == payload.student_id,
-            Grade.date == payload.date,
-            Grade.lesson == payload.lesson,
-            Grade.kind == payload.kind
-        )
-    )
-    grade = (await db.execute(stmt)).scalar_one_or_none()
-
-    if grade:
-        grade.value = payload.value
-    else:
-        grade = Grade(
-            student_id=payload.student_id,
-            date=payload.date,
-            lesson=payload.lesson,
-            kind=payload.kind,
-            value=payload.value
-        )
-        db.add(grade)
-
-    await db.commit()
-    await db.refresh(grade)
-    await invalidate_rating_cache()
-
-    student_name = f"{student.first_name} {student.last_name or ''}".strip()
-    return GradeResponse(
-        id=grade.id,
-        student_id=grade.student_id,
-        date=grade.date,
-        lesson=grade.lesson,
-        kind=grade.kind,
-        value=grade.value,
-        created_at=grade.created_at,
-        student_name=student_name
-    )
-
-
-@router.put("/{grade_id}", response_model=GradeResponse)
-async def update_grade(
-    grade_id: int,
-    payload: GradeUpdate,
-    db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin)
-):
-    """Bitta bahoni yangilash."""
-    stmt = select(Grade).where(Grade.id == grade_id)
-    result = await db.execute(stmt)
-    grade = result.scalar_one_or_none()
-
-    if not grade:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Baho topilmadi"
-        )
-
-    grade.value = payload.value
-    await db.commit()
-    await db.refresh(grade)
-    await invalidate_rating_cache()
-
-    student = await db.get(Student, grade.student_id)
-    student_name = f"{student.first_name} {student.last_name or ''}".strip() if student else ""
-
-    return GradeResponse(
-        id=grade.id,
-        student_id=grade.student_id,
-        date=grade.date,
-        lesson=grade.lesson,
-        kind=grade.kind,
-        value=grade.value,
-        created_at=grade.created_at,
-        student_name=student_name
-    )
-
-
-@router.delete("/{grade_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_grade(
-    grade_id: int,
-    db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin)
-):
-    """Bahoni o'chirish."""
-    stmt = select(Grade).where(Grade.id == grade_id)
-    result = await db.execute(stmt)
-    grade = result.scalar_one_or_none()
-
-    if not grade:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Baho topilmadi"
-        )
-
-    await db.delete(grade)
-    await db.commit()
-    await invalidate_rating_cache()
-    return None
+    return {"ok": True}
