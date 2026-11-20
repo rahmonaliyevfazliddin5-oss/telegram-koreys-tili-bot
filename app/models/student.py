@@ -18,8 +18,9 @@ class Student(Base):
         nullable=False
     )
 
-    absences = relationship("Absence", back_populates="student", cascade="all, delete-orphan")
+    attendance_marks = relationship("AttendanceMark", back_populates="student", cascade="all, delete-orphan")
     grades = relationship("Grade", back_populates="student", cascade="all, delete-orphan")
+    exam_grades = relationship("ExamGrade", back_populates="student", cascade="all, delete-orphan")
     fine_entries = relationship("FineLedger", back_populates="student", cascade="all, delete-orphan")
 
     __table_args__ = (

@@ -75,13 +75,13 @@ def test_lesson_windows():
         mock_now.return_value = datetime(2026, 11, 20, 10, 30, tzinfo=TASHKENT_TZ)
         assert is_lesson_window_open(1, test_date, time(10, 30)) is True
 
-        # 12:00: ochiq
-        mock_now.return_value = datetime(2026, 11, 20, 12, 0, tzinfo=TASHKENT_TZ)
-        assert is_lesson_window_open(1, test_date, time(12, 0)) is True
+        # 11:59: ochiq
+        mock_now.return_value = datetime(2026, 11, 20, 11, 59, tzinfo=TASHKENT_TZ)
+        assert is_lesson_window_open(1, test_date, time(11, 59)) is True
 
-        # 12:01: yopiq
-        mock_now.return_value = datetime(2026, 11, 20, 12, 1, tzinfo=TASHKENT_TZ)
-        assert is_lesson_window_open(1, test_date, time(12, 1)) is False
+        # 12:00: yopiq (tugash kiritilmagan: 12:00:00 dan boshlab yopiq)
+        mock_now.return_value = datetime(2026, 11, 20, 12, 0, tzinfo=TASHKENT_TZ)
+        assert is_lesson_window_open(1, test_date, time(12, 0)) is False
 
         # 2-dars: 15:30 - 20:00
         # 15:29: yopiq
@@ -96,13 +96,13 @@ def test_lesson_windows():
         mock_now.return_value = datetime(2026, 11, 20, 15, 45, tzinfo=TASHKENT_TZ)
         assert is_lesson_window_open(2, test_date, time(15, 45)) is True
 
-        # 20:00: ochiq
-        mock_now.return_value = datetime(2026, 11, 20, 20, 0, tzinfo=TASHKENT_TZ)
-        assert is_lesson_window_open(2, test_date, time(20, 0)) is True
+        # 19:59: ochiq
+        mock_now.return_value = datetime(2026, 11, 20, 19, 59, tzinfo=TASHKENT_TZ)
+        assert is_lesson_window_open(2, test_date, time(19, 59)) is True
 
-        # 20:01: yopiq
-        mock_now.return_value = datetime(2026, 11, 20, 20, 1, tzinfo=TASHKENT_TZ)
-        assert is_lesson_window_open(2, test_date, time(20, 1)) is False
+        # 20:00: yopiq (20:00 dan boshlab yopiq)
+        mock_now.return_value = datetime(2026, 11, 20, 20, 0, tzinfo=TASHKENT_TZ)
+        assert is_lesson_window_open(2, test_date, time(20, 0)) is False
 
         # Dam olish kunida doim yopiq
         mock_now.return_value = datetime(2026, 11, 21, 10, 0, tzinfo=TASHKENT_TZ)

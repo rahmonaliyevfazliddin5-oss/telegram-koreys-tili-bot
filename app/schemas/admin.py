@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 
 
@@ -15,6 +15,9 @@ class LessonWindowInfo(BaseModel):
     window_start: str
     window_end: str
     is_open: bool
+    is_started: bool = False
+    topic: Optional[str] = None
+    lesson_id: Optional[int] = None
 
 
 class StatusResponse(BaseModel):
@@ -22,11 +25,14 @@ class StatusResponse(BaseModel):
     date: str
     current_time: str
     is_weekend: bool
+    is_rest_day: Optional[bool] = None
+    weekday_name: Optional[str] = None
     active_lesson: Optional[int] = None
     lesson1_open: bool
     lesson2_open: bool
     is_any_window_open: bool
     lesson_1: LessonWindowInfo
     lesson_2: LessonWindowInfo
+    exams: List[Dict[str, Any]] = []
     is_blocked: bool = False
     block_ttl: int = 0

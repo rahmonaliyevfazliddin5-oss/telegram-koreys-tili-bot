@@ -42,9 +42,9 @@ def is_lesson_window_open(lesson: int, target_date: Optional[date] = None, targe
         return False
 
     if lesson == 1:
-        return LESSON_1_START <= check_time <= LESSON_1_END
+        return LESSON_1_START <= check_time < LESSON_1_END
     elif lesson == 2:
-        return LESSON_2_START <= check_time <= LESSON_2_END
+        return LESSON_2_START <= check_time < LESSON_2_END
     return False
 
 
@@ -59,8 +59,8 @@ def get_lesson_window_status(now: Optional[datetime] = None) -> Dict[str, Any]:
     current_time_obj = now.time()
     weekend = is_weekend(current_date)
 
-    lesson1_open = (not weekend) and (LESSON_1_START <= current_time_obj <= LESSON_1_END)
-    lesson2_open = (not weekend) and (LESSON_2_START <= current_time_obj <= LESSON_2_END)
+    lesson1_open = (not weekend) and (LESSON_1_START <= current_time_obj < LESSON_1_END)
+    lesson2_open = (not weekend) and (LESSON_2_START <= current_time_obj < LESSON_2_END)
 
     active_lesson = 1 if lesson1_open else (2 if lesson2_open else None)
 
