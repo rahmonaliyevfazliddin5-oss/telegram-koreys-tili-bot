@@ -37,9 +37,9 @@ TEXTS: Dict[str, Dict[str, str]] = {
         "ru": "Рейтинг недоступен или нет учащихся с баллами."
     },
     "rating_note": {
-        "uz": "Izoh: Reytingda faqat eng yuqori natijaga ega dastlabki 3 ta o'quvchi (ball > 0) ko'rsatiladi.",
-        "en": "Note: The rating only displays the top 3 students with the highest scores (score > 0).",
-        "ru": "Примечание: В рейтинге отображаются только первые 3 ученика с наивысшими баллами (балл > 0)."
+        "uz": "Agarda sizning farzandingiz bu ro'yxatda bo'lmasa, o'z ustida ko'proq ishlashi lozim.",
+        "en": "If your child is not on this list, they need to work harder on themselves.",
+        "ru": "Если вашего ребёнка нет в этом списке, ему необходимо больше работать над собой."
     },
     "students_btn": {
         "uz": "O'quvchilar",
@@ -186,8 +186,8 @@ TEXTS: Dict[str, Dict[str, str]] = {
     },
     "admin_exit_btn": {
         "uz": "Admindan chiqish",
-        "en": "Admindan chiqish",
-        "ru": "Admindan chiqish"
+        "en": "Exit admin panel",
+        "ru": "Выйти из админ-панели"
     },
     "admin_webapp_btn": {
         "uz": "Mini App",

@@ -319,7 +319,7 @@ async def test_user_rating_top3_filter_and_note():
         assert "Eldor Sobirov" not in text
         assert "Farrux Zokirov" not in text
         # Ostida izoh matni bo'lishi shart
-        assert "Izoh: Reytingda faqat eng yuqori natijaga ega dastlabki 3 ta o'quvchi" in text
+        assert "Agarda sizning farzandingiz bu ro'yxatda bo'lmasa, o'z ustida ko'proq ishlashi lozim." in text
 
 
 @pytest.mark.asyncio
