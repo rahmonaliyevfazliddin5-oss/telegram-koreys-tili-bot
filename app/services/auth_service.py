@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.admin_settings import AdminSettings
 
-DEFAULT_ADMIN_PASSWORD = "fazliddin0727"
-OLD_DEFAULT_PASSWORDS = ("0727", "0707", "07070707")
+DEFAULT_ADMIN_PASSWORD = "07070707"
+OLD_DEFAULT_PASSWORDS = ("0727", "0707", "fazliddin0727")
 
 
 def hash_password(password: str) -> str:
@@ -26,7 +26,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 async def get_admin_password_hash(session: AsyncSession) -> str:
     """
     admin_settings jadvalidan admin paroli xeshini oladi.
-    Agar mavjud bo'lmasa, dastlabki 'fazliddin0727' paroli bilan yaratadi.
+    Agar mavjud bo'lmasa, dastlabki '07070707' paroli bilan yaratadi.
     """
     stmt = select(AdminSettings).where(AdminSettings.id == 1)
     result = await session.execute(stmt)
