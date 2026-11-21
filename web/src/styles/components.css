@@ -278,3 +278,514 @@ body.keyboard-open .save-dock {
   align-items: center;
   justify-content: center;
 }
+
+/* ====================================================
+   8. BOSH SAHIFA USLUBLARI
+   ==================================================== */
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.home-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.4px;
+}
+
+.home-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.clock-chip {
+  padding: 4px 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Holat kartasi (ixcham) */
+.stat-card {
+  padding: 12px 16px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stat-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+}
+
+.stat-open {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.stat-open .stat-indicator-dot {
+  background: var(--ok);
+}
+
+.stat-closed {
+  background: #F3F4F6;
+  color: var(--muted);
+}
+.stat-closed .stat-indicator-dot {
+  background: var(--muted);
+}
+
+.stat-weekend {
+  background: var(--warn-soft);
+  color: #D97706;
+}
+.stat-weekend .stat-indicator-dot {
+  background: #D97706;
+}
+
+/* Bugungi darslar kartalari (64px) */
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.lessons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-lesson-card {
+  height: var(--row-h);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.home-lesson-card:active:not(.is-closed) {
+  transform: scale(0.98);
+  background: #FFF7F8;
+}
+
+.home-lesson-card.is-closed {
+  background: var(--closed) !important;
+  border-color: #374151 !important;
+  color: #9CA3AF !important;
+  cursor: not-allowed !important;
+}
+
+.home-lesson-card.is-closed .lesson-card-title {
+  color: #9CA3AF !important;
+}
+
+.lesson-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.lesson-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lesson-card-topic {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.lesson-status-chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.chip-started {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.chip-not-started {
+  background: var(--warn-soft);
+  color: #D97706;
+}
+
+.chip-closed {
+  background: #374151;
+  color: #9CA3AF;
+}
+
+/* Halqa kartasi */
+.ring-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.ring-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ring-tab-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.ring-tab-pill {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  background: #F3F4F6;
+  color: var(--muted);
+}
+
+.ring-tab-pill.active {
+  background: var(--brand);
+  color: #FFFFFF;
+}
+
+.ring-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 16px;
+}
+
+.ring-svg-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-center-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-percent {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ring-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ring-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+}
+.dot-present { background: var(--ok); }
+.dot-absent { background: var(--brand); }
+.dot-total { background: var(--muted); }
+
+.stat-label {
+  color: var(--muted);
+  width: 60px;
+}
+
+.stat-val {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* TOP-3 Reyting */
+.top3-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.top3-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.top3-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+}
+
+.top3-row:last-child {
+  border-bottom: none;
+}
+
+.top3-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.rank-badge {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rank-1 { background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; }
+.rank-2 { background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; }
+.rank-3 { background: #FFEDD5; color: #C2410C; border: 1px solid #FED7AA; }
+
+.top3-name-wrap {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.top3-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top3-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.top3-score-chip {
+  padding: 4px 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Manbalar qatori */
+.home-sources-row {
+  height: var(--row-h);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.home-sources-row:active {
+  transform: scale(0.98);
+  background: #FFF7F8;
+}
+
+.home-sources-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sources-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-sources-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ====================================================
+   11. BOSH SAHIFA HEADER & SECTIONS
+   ==================================================== */
+.home-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.home-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.home-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-clock-chip {
+  padding: 4px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.home-section {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-section-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.home-lessons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px;
+}
+.btn-link:active {
+  opacity: 0.7;
+}
+
+.start-lesson-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 0 16px;
+}
+
+.start-lesson-form input {
+  height: 48px;
+  padding: 0 14px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: none;
+  background: #FFFFFF;
+}
+
+.start-lesson-form input:focus {
+  border-color: var(--brand);
+}
+
+.start-lesson-btn {
+  height: 48px;
+  background: var(--brand);
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.start-lesson-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
