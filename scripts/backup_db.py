@@ -1,10 +1,14 @@
 import asyncio
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import json
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
-from app.core.config import settings
+from app.config import settings
 
 async def backup_database(output_path: str = None):
     if not output_path:
