@@ -43,7 +43,7 @@ export function App() {
       case "student-form":
         return <StudentForm id={route.id} />;
       case "grades":
-        return <Grading />;
+        return <Grading lesson={route.query?.lesson} />;
       case "exam-list":
         return <ExamList />;
       case "exam-form":
