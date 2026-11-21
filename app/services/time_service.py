@@ -25,7 +25,12 @@ def is_weekend(d: Optional[date] = None) -> bool:
     return d.weekday() in (5, 6)
 
 
-def is_lesson_window_open(lesson: int, target_date: Optional[date] = None, target_time: Optional[time] = None) -> bool:
+def is_lesson_window_open(
+    lesson: int,
+    target_date: Optional[date] = None,
+    target_time: Optional[time] = None,
+    now: Optional[datetime] = None
+) -> bool:
     """
     Muayyan dars va sana uchun davomat/baho oynasi ochiqligini tekshiradi.
     Faqat joriy ish kunida va belgilangan vaqt oralig'ida ochiq bo'ladi:
@@ -33,12 +38,12 @@ def is_lesson_window_open(lesson: int, target_date: Optional[date] = None, targe
     - 2-dars: 15:30 - 20:00
     Shanba va yakshanba doim yopiq.
     """
-    now = get_tashkent_now()
-    check_date = target_date if target_date is not None else now.date()
-    check_time = target_time if target_time is not None else now.time()
+    current_now = now if now is not None else get_tashkent_now()
+    check_date = target_date if target_date is not None else current_now.date()
+    check_time = target_time if target_time is not None else current_now.time()
 
     # Agar boshqa sana bo'lsa yoki dam olish kuni bo'lsa - yopiq
-    if check_date != now.date() or is_weekend(check_date):
+    if check_date != current_now.date() or is_weekend(check_date):
         return False
 
     if lesson == 1:

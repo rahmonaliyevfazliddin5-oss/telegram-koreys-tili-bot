@@ -29,7 +29,7 @@ async def start_lesson(
             detail="Dam olish kunida dars boshlash taqiqlangan"
         )
 
-    if not is_lesson_window_open(payload.lesson_no, today, now.time()):
+    if not is_lesson_window_open(payload.lesson_no, today, now.time(), now=now):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"{payload.lesson_no}-dars oynasi yopiq"
@@ -74,7 +74,7 @@ async def update_lesson_topic(
     if not lesson:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dars topilmadi")
 
-    if lesson.date != today or is_weekend(today) or not is_lesson_window_open(lesson.lesson_no, today, now.time()):
+    if lesson.date != today or is_weekend(today) or not is_lesson_window_open(lesson.lesson_no, today, now.time(), now=now):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Dars oynasi yopilgan, mavzuni tahrirlash mumkin emas"

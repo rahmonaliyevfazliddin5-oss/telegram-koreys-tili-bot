@@ -65,7 +65,7 @@ async def get_attendance(
 
     # 3. Dars oynasi holati (faqat bugun + ish kuni + oyna ochiq)
     is_today = (attendance_date == now.date())
-    window_open = is_today and (not is_weekend(attendance_date)) and is_lesson_window_open(lesson, target_date=attendance_date, current_time=now.time())
+    window_open = is_today and (not is_weekend(attendance_date)) and is_lesson_window_open(lesson, target_date=attendance_date, target_time=now.time(), now=now)
 
     # 4. Barcha o'quvchilarni olish
     students_stmt = select(Student).order_by(
@@ -230,7 +230,7 @@ async def set_attendance(
         )
 
     # 3. Dars oynasi tekshiruvi
-    if not is_lesson_window_open(payload.lesson, today, now.time()):
+    if not is_lesson_window_open(payload.lesson, today, now.time(), now=now):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"{payload.lesson}-dars oynasi yopiq yoki dam olish kuni"

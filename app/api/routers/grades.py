@@ -166,7 +166,7 @@ async def bulk_save_grades(
             detail="Dam olish kunida baholash taqiqlangan"
         )
 
-    if not is_lesson_window_open(payload.lesson, today, now.time()):
+    if not is_lesson_window_open(payload.lesson, today, now.time(), now=now):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Dars oynasi yopiq yoki dam olish kuni"

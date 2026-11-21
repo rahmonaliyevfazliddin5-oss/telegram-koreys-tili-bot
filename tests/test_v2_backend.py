@@ -194,7 +194,11 @@ async def test_attendance_window_closed_forbidden():
     app.dependency_overrides[get_current_admin] = mock_admin
 
     try:
-        with patch("app.api.routers.attendance.is_lesson_window_open", return_value=False):
+        from zoneinfo import ZoneInfo
+        fake_now = datetime(2026, 11, 20, 9, 0, tzinfo=ZoneInfo("Asia/Tashkent"))
+        with patch("app.api.routers.attendance.get_tashkent_now", return_value=fake_now), \
+             patch("app.api.routers.attendance.is_weekend", return_value=False), \
+             patch("app.api.routers.attendance.is_lesson_window_open", return_value=False):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 res = await client.put(
                     "/api/attendance",
@@ -214,7 +218,11 @@ async def test_grades_window_closed_forbidden():
     app.dependency_overrides[get_current_admin] = mock_admin
 
     try:
-        with patch("app.api.routers.grades.is_lesson_window_open", return_value=False):
+        from zoneinfo import ZoneInfo
+        fake_now = datetime(2026, 11, 20, 9, 0, tzinfo=ZoneInfo("Asia/Tashkent"))
+        with patch("app.api.routers.grades.get_tashkent_now", return_value=fake_now), \
+             patch("app.api.routers.grades.is_weekend", return_value=False), \
+             patch("app.api.routers.grades.is_lesson_window_open", return_value=False):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 res = await client.put(
                     "/api/grades",

@@ -37,7 +37,7 @@ async def create_exam(
             detail="Dam olish kunida imtihon ochish taqiqlangan"
         )
 
-    if not is_lesson_window_open(payload.lesson_no, today, now.time()):
+    if not is_lesson_window_open(payload.lesson_no, today, now.time(), now=now):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"{payload.lesson_no}-dars oynasi yopiq, imtihon ochish taqiqlangan"
@@ -74,7 +74,7 @@ async def update_exam(
     if not exam:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imtihon topilmadi")
 
-    if exam.date != today or is_weekend(today) or not is_lesson_window_open(exam.lesson_no, today, now.time()):
+    if exam.date != today or is_weekend(today) or not is_lesson_window_open(exam.lesson_no, today, now.time(), now=now):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Dars oynasi yopilgan, imtihonni tahrirlash mumkin emas"
@@ -167,7 +167,7 @@ async def save_exam_grades(
     if not exam:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imtihon topilmadi")
 
-    if exam.date != today or is_weekend(today) or not is_lesson_window_open(exam.lesson_no, today, now.time()):
+    if exam.date != today or is_weekend(today) or not is_lesson_window_open(exam.lesson_no, today, now.time(), now=now):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Dars oynasi yopilgan, baholash mumkin emas"

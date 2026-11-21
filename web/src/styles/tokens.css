@@ -1,0 +1,39 @@
+:root {
+  /* Ranglar palitrasi */
+  --bg: #FFF7F8;
+  --card: #FFFFFF;
+  --brand: #E4002B;
+  --brand-soft: #FDE8EC;
+  --text: #1F1F2E;
+  --muted: #6B7280;
+  --ok: #16A34A;
+  --ok-soft: #DCFCE7;
+  --warn: #F59E0B;
+  --warn-soft: #FEF3C7;
+  --closed: #1F1F2E;
+  --border: #F3E8E9;
+  --border-light: #FEECEF;
+
+  /* O'lchamlar va Masofalar */
+  --page-px: 16px;
+  --gap: 12px;
+  --card-radius: 20px;
+  --radius-sm: 10px;
+  --radius-full: 9999px;
+  --row-h: 64px;
+  --tab-h: 60px;
+  --save-h: 56px;
+  --fab-size: 52px;
+
+  /* Z-index Shkalasi */
+  --z-tab: 20;
+  --z-dock: 30;
+  --z-sheet: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* Soyalar */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-dock: 0 -4px 16px rgba(0, 0, 0, 0.06);
+}
