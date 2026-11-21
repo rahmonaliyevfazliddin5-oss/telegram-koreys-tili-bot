@@ -789,3 +789,430 @@ body.keyboard-open .save-dock {
   cursor: not-allowed;
 }
 
+/* ====================================================
+   12. O'QUVCHILAR SAHIFASI
+   ==================================================== */
+.students-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-bar-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.search-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 38px 0 38px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease;
+}
+
+.search-input:focus {
+  border-color: var(--brand);
+}
+
+.search-icon-svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter-chips-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+
+.filter-chips-row::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-chip {
+  padding: 6px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.filter-chip.active {
+  background: var(--brand);
+  color: #FFFFFF;
+  border-color: var(--brand);
+  font-weight: 600;
+}
+
+.students-count-row {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: -2px;
+}
+
+.students-card-list {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.student-row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.student-row-item:last-child {
+  border-bottom: none;
+}
+
+.student-row-item:active {
+  background: #FFF7F8;
+}
+
+.student-row-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.student-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.student-row-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.student-grade-chip {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #F3F4F6;
+  color: var(--muted);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.student-score-badge {
+  padding: 4px 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ====================================================
+   13. O'QUVCHI PROFILI
+   ==================================================== */
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-top-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-top-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-top-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-top-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.btn-icon-action {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: #F3F4F6;
+  border: none;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.btn-icon-action:active {
+  background: #E5E7EB;
+}
+
+/* 6 ta ko'rsatkich 2x3 Grid */
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-grid-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-grid-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stat-grid-val {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-grid-val.val-debt-bad {
+  color: var(--brand);
+}
+
+.stat-grid-val.val-debt-ok {
+  color: var(--ok);
+}
+
+/* Amallar tugmalari (Jarima va Qarzni yopish) */
+.profile-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btn-action-fine {
+  height: 44px;
+  background: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-action-fine:active {
+  background: #FCA5A5;
+}
+
+.btn-action-collect {
+  height: 44px;
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-action-collect:active {
+  background: #86EFAC;
+}
+
+/* Tarix kartasi */
+.profile-history-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-history-header {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.history-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13px;
+}
+
+.history-item-row:last-child {
+  border-bottom: none;
+}
+
+.history-item-type {
+  font-weight: 500;
+}
+.history-type-fine { color: #B91C1C; }
+.history-type-payment { color: #15803D; }
+
+.history-item-date {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.btn-danger-outline {
+  width: 100%;
+  height: 44px;
+  border: 1px solid #FCA5A5;
+  background: transparent;
+  color: #B91C1C;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.btn-danger-outline:active {
+  background: #FEE2E2;
+}
+
+/* ====================================================
+   14. O'QUVCHI FORMASI
+   ==================================================== */
+.student-form-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.form-input {
+  height: 44px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: var(--brand);
+}
+
+.quick-amount-chips {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.quick-chip {
+  padding: 6px 12px;
+  background: #F3F4F6;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quick-chip:active {
+  background: #E5E7EB;
+}
+
+

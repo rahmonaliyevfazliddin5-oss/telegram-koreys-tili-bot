@@ -73,3 +73,26 @@ export function getAvatarColor(str) {
   const index = Math.abs(hash) % AVATAR_COLORS.length;
   return AVATAR_COLORS[index];
 }
+
+export function normalizeSearchString(str) {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .replace(/[‘’’ʻ`]/g, "'")
+    .trim();
+}
+
+export function matchStudentSearch(student, query) {
+  if (!query) return true;
+  const cleanQ = normalizeSearchString(query);
+  const tokens = cleanQ.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+
+  const fn = normalizeSearchString(student.first_name);
+  const ln = normalizeSearchString(student.last_name);
+  const gr = normalizeSearchString(student.grade);
+  const combined = `${ln} ${fn} ${gr} ${fn} ${ln}`;
+
+  return tokens.every((token) => combined.includes(token));
+}
+
