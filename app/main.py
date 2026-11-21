@@ -16,17 +16,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "app" / "static"
 
 from app.config import settings
-from app.database import engine, get_db
+from app.database import engine, get_db, async_session_maker
 from app.redis import get_redis, close_redis
 from app.bot.loader import bot, dp
 from app.api.deps import get_current_admin
 from app.api.routers import students, attendance, grades, sources, admin_auth, status, lessons, exams, teacher
+from app.services.attendance_service import finalize_pending_lessons
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+async def _lesson_finalizer_loop():
+    while True:
+        try:
+            async with async_session_maker() as db:
+                await finalize_pending_lessons(db)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"Lesson finalizer loop xatosi: {e}")
+        await asyncio.sleep(60)
 
 
 @asynccontextmanager
@@ -44,7 +57,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await redis.ping()
     logger.info("Redis ulanishi muvaffaqiyatli.")
 
-    # 3. Botni ishga tushirish (Polling yoki Webhook)
+    # 3. Darslarni yakunlash background loopi
+    finalizer_task = asyncio.create_task(_lesson_finalizer_loop())
+
+    # 4. Botni ishga tushirish (Polling yoki Webhook)
     polling_task = None
     if getattr(settings, "BOT_MODE", "polling") == "polling":
         await bot.delete_webhook(drop_pending_updates=True)
@@ -64,6 +80,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     logger.info("Ilova toxtatilmoqda...")
+    if finalizer_task:
+        finalizer_task.cancel()
+        try:
+            await finalizer_task
+        except (asyncio.CancelledError, Exception):
+            pass
+
     if polling_task:
         polling_task.cancel()
         try:

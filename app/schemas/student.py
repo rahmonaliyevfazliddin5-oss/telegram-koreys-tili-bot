@@ -7,6 +7,7 @@ class StudentBase(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: Optional[str] = Field(default="", max_length=100)
     grade: Optional[str] = Field(default=None, max_length=50)
+    lesson_slots: Optional[int] = Field(default=None, ge=1, le=3)
 
 
 class StudentCreate(StudentBase):
@@ -21,6 +22,11 @@ class StudentResponse(StudentBase):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class BulkSlotsRequest(BaseModel):
+    student_ids: List[int] = Field(..., min_length=1, max_length=200)
+    lesson_slots: int = Field(..., ge=1, le=3)
 
 
 class LedgerItem(BaseModel):
@@ -54,6 +60,7 @@ class StudentProfileResponse(BaseModel):
     first_name: str
     last_name: Optional[str] = ""
     grade: Optional[str] = None
+    lesson_slots: Optional[int] = None
     total_absences: int = 0
     total_lates: int = 0
     total_score: int = 0

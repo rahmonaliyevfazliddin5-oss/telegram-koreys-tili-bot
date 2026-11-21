@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, and_, delete, func
+from sqlalchemy import select, and_, delete, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -37,8 +37,14 @@ async def get_grades(
     if grade_date is None:
         grade_date = get_tashkent_now().date()
 
-    # Barcha o'quvchilarni olish
-    students_stmt = select(Student).order_by(
+    # Shu darsga biriktirilgan (1-dars uchun [1, 3], 2-dars uchun [2, 3]) va belgilanmagan (NULL) o'quvchilar
+    allowed_slots = [1, 3] if lesson == 1 else [2, 3]
+    students_stmt = select(Student).where(
+        or_(
+            Student.lesson_slots.in_(allowed_slots),
+            Student.lesson_slots.is_(None)
+        )
+    ).order_by(
         func.coalesce(func.nullif(Student.last_name, ""), Student.first_name).asc(),
         Student.first_name.asc()
     )
@@ -97,6 +103,7 @@ async def get_grades(
             "first_name": s.first_name,
             "last_name": s.last_name or "",
             "grade": s.grade,
+            "lesson_slots": s.lesson_slots,
             "student_name": full_name
         })
 
@@ -188,6 +195,16 @@ async def bulk_save_grades(
         )
 
     items = payload.items or []
+
+    # 0. Darsga biriktirilganlik validatsiyasi (boshqa darsga tegishli bo'lsa 422)
+    allowed_slots = [1, 3] if payload.lesson == 1 else [2, 3]
+    for item in items:
+        std = await db.get(Student, item.student_id)
+        if isinstance(std, Student) and std.lesson_slots is not None and std.lesson_slots not in allowed_slots:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"O'quvchi (id={item.student_id}) bu darsga biriktirilmagan"
+            )
 
     # 1. Server qoidalari validatsiyasi
     for item in items:

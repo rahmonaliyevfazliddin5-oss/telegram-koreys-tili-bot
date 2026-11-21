@@ -2,6 +2,7 @@ from app.models.base import Base
 from app.models.bot_user import BotUser
 from app.models.student import Student
 from app.models.lesson import Lesson
+from app.models.lesson_absence import LessonAbsence
 from app.models.exam import Exam, ExamGrade
 from app.models.attendance import AttendanceSession, AttendanceMark, Absence
 from app.models.grade import Grade
@@ -14,6 +15,7 @@ __all__ = [
     "BotUser",
     "Student",
     "Lesson",
+    "LessonAbsence",
     "Exam",
     "ExamGrade",
     "AttendanceSession",

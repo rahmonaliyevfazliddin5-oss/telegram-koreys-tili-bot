@@ -2,7 +2,7 @@ import re
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from redis.asyncio import Redis
-from sqlalchemy import select, or_, and_, func
+from sqlalchemy import select, or_, and_, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -22,7 +22,8 @@ from app.schemas.student import (
     AttendanceHistoryItem,
     FineCreate,
     CollectCreate,
-    LedgerResponse
+    LedgerResponse,
+    BulkSlotsRequest
 )
 from app.schemas.attendance import format_late_display
 from app.services.attendance_service import (
@@ -50,12 +51,22 @@ async def get_student_debt(db: AsyncSession, student_id: int) -> int:
 @router.get("", response_model=List[StudentResponse])
 async def get_students(
     search: Optional[str] = Query(None, description="Ism, familiya yoki sinf bo'yicha qidiruv"),
+    slots: Optional[str] = Query(None, description="unset | 1 | 2 | both"),
     limit: int = Query(500, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_current_admin)
 ):
     stmt = select(Student)
+    if slots == "unset":
+        stmt = stmt.where(Student.lesson_slots.is_(None))
+    elif slots == "1":
+        stmt = stmt.where(Student.lesson_slots == 1)
+    elif slots == "2":
+        stmt = stmt.where(Student.lesson_slots == 2)
+    elif slots == "both":
+        stmt = stmt.where(Student.lesson_slots == 3)
+
     if search:
         s_clean = re.sub(r"[‘’’ʻ`]", "%", search.strip())
         tokens = [t.strip() for t in s_clean.split() if t.strip()]
@@ -189,7 +200,8 @@ async def get_student_profile(
         "id": student.id,
         "first_name": student.first_name,
         "last_name": student.last_name or "",
-        "grade": student.grade
+        "grade": student.grade,
+        "lesson_slots": student.lesson_slots
     }
 
     stats = StudentStats(
@@ -206,6 +218,7 @@ async def get_student_profile(
         "first_name": student.first_name,
         "last_name": student.last_name or "",
         "grade": student.grade,
+        "lesson_slots": student.lesson_slots,
         "total_absences": int(total_absences),
         "total_lates": int(total_lates),
         "total_score": int(total_score),
@@ -351,16 +364,48 @@ async def collect_debt(
     }
 
 
+@router.post("/bulk-slots", status_code=status.HTTP_200_OK)
+async def bulk_update_slots(
+    payload: BulkSlotsRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_current_admin)
+):
+    """
+    Bir nechta o'quvchining darslarini ommaviy biriktirish (bitta tranzaksiyada, 200 tagacha).
+    """
+    if not payload.student_ids:
+        raise HTTPException(status_code=400, detail="O'quvchilar ro'yxati bo'sh")
+    if payload.lesson_slots not in (1, 2, 3):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="lesson_slots 1, 2 yoki 3 bo'lishi shart")
+
+    stmt = (
+        update(Student)
+        .where(Student.id.in_(payload.student_ids[:200]))
+        .values(lesson_slots=payload.lesson_slots)
+    )
+    res = await db.execute(stmt)
+    await db.commit()
+    await invalidate_all_caches()
+    return {"ok": True, "updated_count": res.rowcount}
+
+
 @router.post("", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 async def create_student(
     payload: StudentCreate,
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_current_admin)
 ):
+    if payload.lesson_slots is not None and payload.lesson_slots not in (1, 2, 3):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="lesson_slots 1, 2 yoki 3 bo'lishi shart"
+        )
+
     student = Student(
         first_name=payload.first_name.strip(),
         last_name=payload.last_name.strip() if payload.last_name else "",
-        grade=payload.grade.strip() if payload.grade else None
+        grade=payload.grade.strip() if payload.grade else None,
+        lesson_slots=payload.lesson_slots
     )
     db.add(student)
     await db.commit()
@@ -391,6 +436,13 @@ async def update_student(
     student.first_name = payload.first_name.strip()
     student.last_name = payload.last_name.strip() if payload.last_name else ""
     student.grade = payload.grade.strip() if payload.grade else None
+    if payload.lesson_slots is not None:
+        if payload.lesson_slots not in (1, 2, 3):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="lesson_slots 1, 2 yoki 3 bo'lishi shart"
+            )
+        student.lesson_slots = payload.lesson_slots
 
     await db.commit()
     await db.refresh(student)

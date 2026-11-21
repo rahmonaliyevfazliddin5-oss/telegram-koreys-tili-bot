@@ -9,6 +9,7 @@ export function StudentForm({ id }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [grade, setGrade] = useState("");
+  const [lessonSlots, setLessonSlots] = useState(null); // 1 | 2 | 3 | null
   const [isLoading, setIsLoading] = useState(isEdit);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -22,6 +23,7 @@ export function StudentForm({ id }) {
           setFirstName(data.first_name || "");
           setLastName(data.last_name || "");
           setGrade(data.grade || "");
+          setLessonSlots(data.lesson_slots || null);
         }
       })
       .catch((err) => {
@@ -48,6 +50,12 @@ export function StudentForm({ id }) {
       return;
     }
 
+    // Yangi o'quvchida tanlash MAJBURIY!
+    if (!isEdit && (lessonSlots === null || lessonSlots === undefined)) {
+      showToast("Qaysi darsga qatnashishi tanlanishi shart", "warn");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (isEdit) {
@@ -56,7 +64,8 @@ export function StudentForm({ id }) {
           body: {
             first_name: cleanFirst,
             last_name: cleanLast || null,
-            grade: cleanGrade || null
+            grade: cleanGrade || null,
+            lesson_slots: lessonSlots
           }
         });
         showToast("O'quvchi yangilandi", "success");
@@ -66,7 +75,8 @@ export function StudentForm({ id }) {
           body: {
             first_name: cleanFirst,
             last_name: cleanLast || null,
-            grade: cleanGrade || null
+            grade: cleanGrade || null,
+            lesson_slots: lessonSlots
           }
         });
         showToast("O'quvchi qo'shildi", "success");
@@ -86,6 +96,11 @@ export function StudentForm({ id }) {
       </div>
     );
   }
+
+  // Yangi o'quvchida ism va dars tanlovi ikkalasi ham to'ldirilgan bo'lishi shart
+  const isFormValid = isEdit
+    ? Boolean(firstName.trim())
+    : Boolean(firstName.trim() && lessonSlots !== null);
 
   return (
     <div class="student-form-page">
@@ -128,12 +143,40 @@ export function StudentForm({ id }) {
             onInput={(e) => setGrade(e.target.value)}
           />
         </div>
+
+        {/* Qaysi darsga uch holatli tanlov: 1-dars | 2-dars | Ikkalasi */}
+        <div class="form-group">
+          <label class="form-label">Qaysi darsga *</label>
+          <div class="slot-selection-chips">
+            <button
+              type="button"
+              class={`slot-select-btn ${lessonSlots === 1 ? "active" : ""}`}
+              onClick={() => setLessonSlots(1)}
+            >
+              1-dars
+            </button>
+            <button
+              type="button"
+              class={`slot-select-btn ${lessonSlots === 2 ? "active" : ""}`}
+              onClick={() => setLessonSlots(2)}
+            >
+              2-dars
+            </button>
+            <button
+              type="button"
+              class={`slot-select-btn ${lessonSlots === 3 ? "active" : ""}`}
+              onClick={() => setLessonSlots(3)}
+            >
+              Ikkalasi
+            </button>
+          </div>
+        </div>
       </form>
 
       {/* Saqlash paneli (SaveDock) */}
       <SaveDock
         visible={true}
-        disabled={!firstName.trim()}
+        disabled={!isFormValid}
         loading={isSubmitting}
         text="Saqlash"
         onSave={handleSubmit}

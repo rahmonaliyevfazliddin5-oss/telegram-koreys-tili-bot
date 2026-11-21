@@ -447,9 +447,14 @@ export function Grading({ lesson: initialLesson = 1 }) {
                       firstName={student.first_name}
                       size={36}
                     />
-                    <span class="grading-student-name">
-                      {formatName(student.last_name, student.first_name)}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden" }}>
+                      <span class="grading-student-name">
+                        {formatName(student.last_name, student.first_name)}
+                      </span>
+                      {student.lesson_slots === null && (
+                        <span class="slot-badge-chip slot-badge-unset" title="Dars belgilanmagan">?</span>
+                      )}
+                    </div>
                   </div>
 
                   <div class="grading-student-right">

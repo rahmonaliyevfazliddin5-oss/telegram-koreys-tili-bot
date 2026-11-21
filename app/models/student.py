@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import String, DateTime, Index
+from sqlalchemy import String, DateTime, Index, SmallInteger, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
@@ -12,6 +12,7 @@ class Student(Base):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="")
     grade: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
+    lesson_slots: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -22,7 +23,10 @@ class Student(Base):
     grades = relationship("Grade", back_populates="student", cascade="all, delete-orphan")
     exam_grades = relationship("ExamGrade", back_populates="student", cascade="all, delete-orphan")
     fine_entries = relationship("FineLedger", back_populates="student", cascade="all, delete-orphan")
+    absences = relationship("LessonAbsence", back_populates="student", cascade="all, delete-orphan")
 
     __table_args__ = (
+        CheckConstraint("lesson_slots IN (1, 2, 3) OR lesson_slots IS NULL", name="ck_students_lesson_slots"),
         Index("ix_students_name", "last_name", "first_name"),
+        Index("ix_students_lesson_slots", "lesson_slots"),
     )
