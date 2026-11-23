@@ -420,6 +420,8 @@ async def test_user_teacher_info():
     message.answer.assert_called_once()
     assert "O'qituvchi haqida ma'lumot" in message.answer.call_args[0][0]
     assert "TOPIK II" in message.answer.call_args[0][0]
+    assert "titki, ilki, sigi, maragi" in message.answer.call_args[0][0]
+    assert "Sohibqiron 245" in message.answer.call_args[0][0]
 
 
 @pytest.mark.asyncio
@@ -433,3 +435,4 @@ async def test_user_contact():
     )
     message.answer.assert_called_once()
     assert "+998901644566" in message.answer.call_args[0][0]
+    assert "Sohibqiron 245" in message.answer.call_args[0][0]

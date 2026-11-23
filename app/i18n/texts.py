@@ -132,21 +132,24 @@ TEXTS: Dict[str, Dict[str, str]] = {
             "Ism: Koreys tili ustozi\n"
             "Malaka: TOPIK II (6-daraja), Janubiy Koreya universitetlari bitiruvchisi\n"
             "Tajriba: 5 yildan ortiq professional pedagogik faoliyat\n"
-            "Yo'nalishlar: Boshlang'ichdan professional darajagacha koreys tili, grammatika, leksika, so'zlashuv va TOPIK imtihonlariga tayyorlov."
+            "Yo'nalishlar: TOPIK 1dan 6 darajagacha titki, ilki, sigi, maragi darslarida professional dars o'tadi. TOPIK imtihonlariga tayyorlov.\n"
+            "Manzil: Farg'ona shahar, Sohibqiron 245"
         ),
         "en": (
             "Information about the teacher:\n\n"
             "Name: Korean Language Instructor\n"
             "Qualification: TOPIK II (Level 6), graduate of South Korean universities\n"
             "Experience: Over 5 years of professional teaching experience\n"
-            "Courses: Korean language from beginner to advanced level, grammar, vocabulary, conversational fluency, and TOPIK exam preparation."
+            "Courses: Professional lessons from TOPIK Level 1 to 6 (listening, reading, writing, speaking). TOPIK exam preparation.\n"
+            "Address: Fergana city, Sohibqiron 245"
         ),
         "ru": (
             "Информация о преподавателе:\n\n"
             "Имя: Преподаватель корейского языка\n"
             "Квалификация: TOPIK II (6-й уровень), выпускник университетов Южной Кореи\n"
             "Опыт: Более 5 лет профессионального педагогического стажа\n"
-            "Направления: Корейский язык от начального до продвинутого уровня, грамматика, лексика, разговорная практика и подготовка к экзамену TOPIK."
+            "Направления: Профессиональные уроки от TOPIK 1 до 6 уровня (аудирование, чтение, письмо, говорение). Подготовка к экзаменам TOPIK.\n"
+            "Адрес: город Фергана, Сохибкирон 245"
         )
     },
     "contact_btn": {
@@ -158,19 +161,22 @@ TEXTS: Dict[str, Dict[str, str]] = {
         "uz": (
             "Bog'lanish uchun ma'lumotlar:\n\n"
             "Telefon: +998901644566\n"
-            "Telegram: @koreys_admin\n\n"
+            "Telegram: @koreys_admin\n"
+            "Manzil: Farg'ona shahar, Sohibqiron 245\n\n"
             "Savollar yoki darslarga yozilish bo'yicha yuqoridagi kontakt orqali bog'lanishingiz mumkin."
         ),
         "en": (
             "Contact details:\n\n"
             "Phone: +998901644566\n"
-            "Telegram: @koreys_admin\n\n"
+            "Telegram: @koreys_admin\n"
+            "Address: Fergana city, Sohibqiron 245\n\n"
             "For inquiries or enrollment, feel free to reach out via the contact above."
         ),
         "ru": (
             "Контактная информация:\n\n"
             "Телефон: +998901644566\n"
-            "Telegram: @koreys_admin\n\n"
+            "Telegram: @koreys_admin\n"
+            "Адрес: город Фергана, Сохибкирон 245\n\n"
             "По вопросам записи на занятия обращайтесь по указанным выше контактам."
         )
     },
