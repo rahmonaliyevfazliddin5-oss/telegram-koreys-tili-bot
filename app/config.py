@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     ADMIN_SESSION_TTL: int = Field(43200, description="Admin sessiyasi amal qilish muddati (soniyalarda, 12 soat)")
     RATE_LIMIT_REQUESTS: int = Field(30, description="Rate limit so'rovlar soni")
     RATE_LIMIT_WINDOW: int = Field(60, description="Rate limit vaqt oralig'i (soniyalarda)")
+    FORCE_LESSONS_OPEN: bool = Field(True, description="Barcha dars oynalarini doimiy ochiq qilib qo'yish (test rejimi)")
 
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"),

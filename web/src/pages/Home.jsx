@@ -95,7 +95,7 @@ export function Home() {
   }, [status?.date, activeLesson, l1Started, l2Started]);
 
   const handleLessonClick = (lessonNo) => {
-    const isWeekend = status?.is_weekend || status?.is_rest_day;
+    const isWeekend = (status?.is_weekend || status?.is_rest_day) && !status?.lesson_1?.is_open;
     const lessonInfo = lessonNo === 1 ? status?.lesson_1 : status?.lesson_2;
 
     if (isWeekend || !lessonInfo?.is_open) {

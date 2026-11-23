@@ -924,7 +924,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function isLessonWindowOpen(lesson) {
-  if (systemStatus.is_weekend) return false;
+  if (systemStatus.is_weekend && !systemStatus.lesson1_open) return false;
   if (lesson === 1) return systemStatus.lesson1_open;
   if (lesson === 2) return systemStatus.lesson2_open;
   return false;
@@ -938,11 +938,11 @@ function updateTodayCardsUI() {
   const topic1 = document.getElementById("topicLesson1");
 
   const l1 = systemStatus.lesson_1;
-  const isL1Open = systemStatus.lesson1_open && !systemStatus.is_weekend;
+  const isL1Open = systemStatus.lesson1_open && (!systemStatus.is_weekend || systemStatus.lesson1_open);
 
   if (card1 && badge1 && topic1) {
     badge1.className = "lesson-card-badge";
-    if (systemStatus.is_weekend || !isL1Open) {
+    if ((systemStatus.is_weekend && !systemStatus.lesson1_open) || !isL1Open) {
       card1.classList.add("closed");
       badge1.classList.add("badge-closed");
       badge1.textContent = "Yopiq";
@@ -967,11 +967,11 @@ function updateTodayCardsUI() {
   const topic2 = document.getElementById("topicLesson2");
 
   const l2 = systemStatus.lesson_2;
-  const isL2Open = systemStatus.lesson2_open && !systemStatus.is_weekend;
+  const isL2Open = systemStatus.lesson2_open && (!systemStatus.is_weekend || systemStatus.lesson2_open);
 
   if (card2 && badge2 && topic2) {
     badge2.className = "lesson-card-badge";
-    if (systemStatus.is_weekend || !isL2Open) {
+    if ((systemStatus.is_weekend && !systemStatus.lesson2_open) || !isL2Open) {
       card2.classList.add("closed");
       badge2.classList.add("badge-closed");
       badge2.textContent = "Yopiq";

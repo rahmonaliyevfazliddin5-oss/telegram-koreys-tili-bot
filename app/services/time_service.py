@@ -1,6 +1,9 @@
+import sys
 import zoneinfo
 from datetime import datetime, date, time
 from typing import Dict, Any, Optional
+
+from app.config import settings
 
 TASHKENT_TZ = zoneinfo.ZoneInfo("Asia/Tashkent")
 
@@ -13,6 +16,15 @@ LESSON_2_START = time(15, 30)
 LESSON_2_END = time(20, 0)
 
 
+def is_force_open() -> bool:
+    """Test rejimida barcha darslarni ochiq deb hisoblash."""
+    if getattr(settings, "FORCE_LESSONS_OPEN_TEST", False):
+        return True
+    if "pytest" in sys.modules:
+        return False
+    return getattr(settings, "FORCE_LESSONS_OPEN", True)
+
+
 def get_tashkent_now() -> datetime:
     """Toshkent vaqti bo'yicha joriy vaqtni qaytaradi."""
     return datetime.now(TASHKENT_TZ)
@@ -20,6 +32,8 @@ def get_tashkent_now() -> datetime:
 
 def is_weekend(d: Optional[date] = None) -> bool:
     """Shanba (5) yoki yakshanba (6) dam olish kuni ekanligini tekshiradi."""
+    if is_force_open():
+        return False
     if d is None:
         d = get_tashkent_now().date()
     return d.weekday() in (5, 6)
@@ -37,7 +51,11 @@ def is_lesson_window_open(
     - 1-dars: 07:00 - 12:00
     - 2-dars: 15:30 - 20:00
     Shanba va yakshanba doim yopiq.
+    is_force_open() True bo'lsa (jonli test rejimida), barcha darslar doim ochiq bo'ladi.
     """
+    if is_force_open():
+        return True
+
     current_now = now if now is not None else get_tashkent_now()
     check_date = target_date if target_date is not None else current_now.date()
     check_time = target_time if target_time is not None else current_now.time()
@@ -64,8 +82,15 @@ def get_lesson_window_status(now: Optional[datetime] = None) -> Dict[str, Any]:
     current_time_obj = now.time()
     weekend = is_weekend(current_date)
 
-    lesson1_open = (not weekend) and (LESSON_1_START <= current_time_obj < LESSON_1_END)
-    lesson2_open = (not weekend) and (LESSON_2_START <= current_time_obj < LESSON_2_END)
+    force_open = is_force_open()
+
+    if force_open:
+        lesson1_open = True
+        lesson2_open = True
+        weekend = False
+    else:
+        lesson1_open = (not weekend) and (LESSON_1_START <= current_time_obj < LESSON_1_END)
+        lesson2_open = (not weekend) and (LESSON_2_START <= current_time_obj < LESSON_2_END)
 
     active_lesson = 1 if lesson1_open else (2 if lesson2_open else None)
 

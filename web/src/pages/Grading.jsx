@@ -99,15 +99,16 @@ export function Grading({ lesson: initialLesson = 1 }) {
 
   // Holat mashinasi (State machine)
   const isSelectedDateWeekend = useMemo(() => {
+    if (Boolean(status?.lesson_1?.is_open || status?.lesson_2?.is_open)) return false;
     if (!selectedDate) return false;
     const d = new Date(selectedDate);
     const day = d.getDay();
     return day === 0 || day === 6;
-  }, [selectedDate]);
+  }, [selectedDate, status]);
 
   const isToday = selectedDate === todayDate;
   const currentLessonInfo = activeLesson === 1 ? status?.lesson_1 : status?.lesson_2;
-  const isLessonWindowOpen = isToday && !isWeekendDay && Boolean(currentLessonInfo?.is_open);
+  const isLessonWindowOpen = isToday && (!isWeekendDay || Boolean(currentLessonInfo?.is_open)) && Boolean(currentLessonInfo?.is_open);
   const isLessonStarted = Boolean(currentLessonInfo?.is_started);
 
   let pageState = "CLOSED";

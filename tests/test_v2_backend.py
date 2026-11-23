@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
+from app.config import settings
 from app.api.deps import get_current_admin
 from app.database import get_db
 from app.redis import get_redis

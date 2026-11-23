@@ -11,6 +11,7 @@ from app.models.grade import Grade
 from app.models.attendance import AttendanceMark
 from app.services.time_service import get_tashkent_now, LESSON_1_END, LESSON_2_END
 from app.services.cache_service import invalidate_all_caches
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
