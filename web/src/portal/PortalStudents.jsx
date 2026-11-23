@@ -63,7 +63,7 @@ export function PortalStudents() {
       {/* List Header */}
       <div class="portal-card-header">
         <h3 class="portal-card-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E4002B" stroke-width="2">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
             <circle cx="9" cy="7" r="4"></circle>
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -74,15 +74,15 @@ export function PortalStudents() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "50px 0", color: "#94A3B8" }}>
+        <div style={{ textAlign: "center", padding: "50px 0", color: "#6B7280" }}>
           Yuklanmoqda...
         </div>
       ) : error ? (
-        <div style={{ textAlign: "center", padding: "40px 0", color: "#EF4444" }}>
+        <div style={{ textAlign: "center", padding: "40px 0", color: "#E4002B" }}>
           {error}
         </div>
       ) : students.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "30px 0", color: "#64748B" }}>
+        <div style={{ textAlign: "center", padding: "30px 0", color: "#9CA3AF" }}>
           O'quvchilar topilmadi
         </div>
       ) : (

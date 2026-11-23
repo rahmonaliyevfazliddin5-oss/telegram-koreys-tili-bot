@@ -6,6 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
 from app.database import get_db
+from app.redis import get_redis
+from redis.asyncio import Redis
+from fastapi import Request
+from app.config import settings
+from app.api.auth import validate_init_data
 from app.models.student import Student
 from app.models.lesson import Lesson
 from app.models.exam import Exam, ExamGrade
@@ -38,6 +43,40 @@ from app.schemas.portal import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/portal", tags=["portal"])
+
+
+@router.get("/me")
+async def get_portal_current_user(
+    request: Request,
+    redis: Redis = Depends(get_redis)
+):
+    """
+    Joriy foydalanuvchining rolini (admin yoki ota-ona/foydalanuvchi) tekshirish.
+    Admin bo'lish uchun Telegramda /admin buyrug'i va paroli kiritilgan bo'lishi shart.
+    Aks holda hech kim admin panelga kira olmaydi va admin borligini ham ko'rmaydi.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        return {"is_admin": False}
+
+    init_data = auth_header
+    if init_data.startswith("tma "):
+        init_data = init_data[4:].strip()
+    elif init_data.startswith("Bearer "):
+        init_data = init_data[7:].strip()
+
+    try:
+        user_info = validate_init_data(init_data, settings.BOT_TOKEN)
+        user_id = user_info.get("user_id")
+        if user_id:
+            session_key = f"admin_session:{user_id}"
+            is_active = await redis.get(session_key)
+            if is_active:
+                return {"is_admin": True, "user_id": user_id}
+    except Exception:
+        pass
+
+    return {"is_admin": False}
 
 
 @router.get("/leaderboard", response_model=PortalLeaderboardResponse)
@@ -325,6 +364,11 @@ async def get_portal_student_detail(
         for l in lessons_with_homework
     ]
 
+    # Jami o'tilgan darslar soni va o'quvchi qatnashgan darslar soni
+    total_teacher_lessons = (await db.execute(select(func.count(Lesson.id)))).scalar_one() or 0
+    absences_cnt = att_stats.get("absences", 0)
+    attended_lessons_count = max(0, total_teacher_lessons - absences_cnt)
+
     return PortalStudentDetailResponse(
         id=student.id,
         first_name=student.first_name,
@@ -334,8 +378,10 @@ async def get_portal_student_detail(
         total_score=r_info.get("total_score", 0),
         daily_score=r_info.get("daily_score", 0),
         exam_score=r_info.get("exam_score", 0),
-        absences_count=att_stats.get("absences", 0),
+        absences_count=absences_cnt,
         lates_count=att_stats.get("lates", 0),
+        total_teacher_lessons=total_teacher_lessons,
+        attended_lessons_count=attended_lessons_count,
         recent_grades=recent_grades,
         recent_exams=recent_exams,
         teacher_notes=teacher_notes

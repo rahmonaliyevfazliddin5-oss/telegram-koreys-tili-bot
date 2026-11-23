@@ -27,7 +27,7 @@ def get_main_menu_keyboard(lang: str = "uz", resource_titles: Optional[List[str]
     teacher_text = get_text("teacher_btn", lang)
     contact_text = get_text("contact_btn", lang)
     miniapp_text = get_text("user_miniapp_btn", lang)
-    portal_url = f"{settings.WEBAPP_URL}/app#/portal"
+    portal_url = f"{settings.WEBAPP_URL}/app"
 
     keyboard = [
         [KeyboardButton(text=miniapp_text, web_app=WebAppInfo(url=portal_url))],
@@ -49,7 +49,7 @@ def get_main_menu_keyboard(lang: str = "uz", resource_titles: Optional[List[str]
 
 def get_portal_webapp_keyboard(lang: str = "uz") -> InlineKeyboardMarkup:
     btn_text = get_text("user_miniapp_btn", lang)
-    webapp_url = f"{settings.WEBAPP_URL}/app#/portal"
+    webapp_url = f"{settings.WEBAPP_URL}/app"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [

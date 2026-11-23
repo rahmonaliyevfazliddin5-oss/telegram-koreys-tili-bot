@@ -92,6 +92,8 @@ class PortalStudentDetailResponse(BaseModel):
     exam_score: int = 0
     absences_count: int = 0
     lates_count: int = 0
+    total_teacher_lessons: int = 0
+    attended_lessons_count: int = 0
     recent_grades: List[PortalGradeItem] = []
     recent_exams: List[PortalExamItem] = []
     teacher_notes: List[PortalTeacherNote] = []
