@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 COPY --from=frontend-builder /web/dist /workspace/web/dist
+COPY --from=frontend-builder /web/dist /workspace/app/static
 
 EXPOSE 8000
 

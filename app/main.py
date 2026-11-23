@@ -13,7 +13,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-STATIC_DIR = BASE_DIR / "app" / "static"
+DIST_DIR = BASE_DIR / "web" / "dist"
+STATIC_DIR = DIST_DIR if DIST_DIR.exists() else (BASE_DIR / "app" / "static")
 
 from app.config import settings
 from app.database import engine, get_db, async_session_maker
