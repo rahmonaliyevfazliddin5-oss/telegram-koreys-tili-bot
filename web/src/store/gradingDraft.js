@@ -1,10 +1,16 @@
 let drafts = {};
 let originalStates = {};
+let isUnsavedFlag = false;
 const listeners = new Set();
+
+export function setUnsavedChanges(val) {
+  isUnsavedFlag = Boolean(val);
+}
 
 export function setOriginalGrades(items) {
   drafts = {};
   originalStates = {};
+  isUnsavedFlag = false;
   for (const item of items) {
     const sId = item.student_id;
     originalStates[sId] = {
@@ -36,6 +42,7 @@ export function getAllDrafts() {
 }
 
 export function hasUnsavedChanges() {
+  if (isUnsavedFlag) return true;
   for (const sId of Object.keys(drafts)) {
     const d = drafts[sId];
     const o = originalStates[sId] || { status: "absent", value: null, late_minutes: null };

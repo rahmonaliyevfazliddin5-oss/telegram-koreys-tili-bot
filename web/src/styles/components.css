@@ -2078,6 +2078,27 @@ body.keyboard-open .save-dock {
   border-color: var(--brand);
 }
 
+.add-student-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-full);
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: opacity 0.15s ease;
+}
+
+.add-student-quick-btn:active {
+  opacity: 0.85;
+}
+
+
 
 
 

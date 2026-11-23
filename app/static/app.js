@@ -432,16 +432,8 @@ function hasUnsavedChanges() {
 
 async function confirmDiscardChangesIfNeeded() {
   if (!hasUnsavedChanges()) return true;
-  const proceed = await confirmAction(
-    "Saqlanmagan o'zgarishlar bor. Haqiqatan ham sahifadan chiqmoqchimisiz?",
-    "Saqlanmagan o'zgarishlar"
-  );
-  if (proceed) {
-    isAttDirty = false;
-    isGradeDailyDirty = false;
-    isGradeExamDirty = false;
-  }
-  return proceed;
+  showToast("Avval o'zgarishlarni saqlang", "warn");
+  return false;
 }
 
 async function switchTab(tabId) {
@@ -1390,8 +1382,9 @@ formStartLesson?.addEventListener("submit", async (e) => {
     updateBackButton();
 
     await fetchStatus();
-    if (currentTabId === "tabAttendance") await loadAttendance();
-    if (currentTabId === "tabGrades") await loadGrades();
+    await switchTab("tabGrades");
+    currentGradeLesson = lessonNo;
+    await loadGrades();
   } catch (err) {
   } finally {
     btnSubmitStartLesson.disabled = false;
@@ -3286,6 +3279,7 @@ async function executeSaveDailyGrades() {
     showToast("Dars baholari muvaffaqiyatli saqlandi", "success");
     await loadGrades();
     loadHomeDashboard();
+    openTeacherProfile();
   } catch (err) {
     if (err.message && (err.message.includes("yopiq") || err.message.includes("403") || err.message.includes("taqiqlangan"))) {
       await fetchStatus();

@@ -136,6 +136,7 @@ export function Home() {
       showToast("Dars boshlandi", "success");
       setSheetOpen(false);
       await fetchStatus();
+      navigate(`grades?lesson=${startLessonNo}`);
     } catch (err) {
       showToast(err.message || "Xatolik yuz berdi", "error");
     } finally {

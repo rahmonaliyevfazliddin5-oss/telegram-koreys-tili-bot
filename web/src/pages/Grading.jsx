@@ -8,6 +8,8 @@ import { WeekStrip } from "../components/WeekStrip.jsx";
 import { MonthSheet } from "../components/MonthSheet.jsx";
 import { Sheet } from "../components/Sheet.jsx";
 import { SaveDock } from "../components/SaveDock.jsx";
+import { setUnsavedChanges } from "../store/gradingDraft.js";
+import { navigate } from "../router.js";
 
 export function Grading({ lesson: initialLesson = 1 }) {
   const [status, setStatus] = useState(getStatus());
@@ -49,6 +51,14 @@ export function Grading({ lesson: initialLesson = 1 }) {
   // Kech qolish modal/sheet
   const [lateSheetStudent, setLateSheetStudent] = useState(null);
   const [lateMinutesInput, setLateMinutesInput] = useState("15");
+
+  // O'quvchi qo'shish Sheet
+  const [addStudentSheetOpen, setAddStudentSheetOpen] = useState(false);
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newGrade, setNewGrade] = useState("");
+  const [newLessonSlots, setNewLessonSlots] = useState(Number(initialLesson) || 1);
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
 
   // Status obunasi
   useEffect(() => {
@@ -128,6 +138,14 @@ export function Grading({ lesson: initialLesson = 1 }) {
     }
     return false;
   }, [draftMap, initialMap, pageState]);
+
+  // Unsaved changes global holatini sinxronlashtirish
+  useEffect(() => {
+    setUnsavedChanges(hasChanges);
+    return () => {
+      setUnsavedChanges(false);
+    };
+  }, [hasChanges]);
 
   // Baho yoki kech qoldi qo'yilganlar soni
   const gradedCount = useMemo(() => {
@@ -255,12 +273,71 @@ export function Grading({ lesson: initialLesson = 1 }) {
       });
 
       showToast("Baholar saqlandi", "success");
-      await loadGrades();
+      setInitialMap({ ...draftMap });
+      setUnsavedChanges(false);
       await fetchStatus();
+      // Requirement 1: mini app dagi saqlash tugmasini bosgandi darslar avtomatk oqituvchi profiliga otsin
+      navigate("teacher");
     } catch (err) {
       showToast(err.message || "Saqlashda xatolik yuz berdi", "error");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // O'quvchi qo'shish
+  const handleAddStudent = async (e) => {
+    e.preventDefault();
+    const cleanFirst = newFirstName.trim();
+    const cleanLast = newLastName.trim();
+    const cleanGrade = newGrade.trim();
+
+    if (!cleanFirst) {
+      showToast("Ismni kiriting", "warn");
+      return;
+    }
+    if (!newLessonSlots) {
+      showToast("Qaysi darsga qatnashishi tanlanishi shart", "warn");
+      return;
+    }
+
+    setIsAddingStudent(true);
+    try {
+      await apiRequest("/api/students", {
+        method: "POST",
+        body: {
+          first_name: cleanFirst,
+          last_name: cleanLast || null,
+          grade: cleanGrade || null,
+          lesson_slots: newLessonSlots
+        }
+      });
+      showToast("O'quvchi qo'shildi", "success");
+      setAddStudentSheetOpen(false);
+      setNewFirstName("");
+      setNewLastName("");
+      setNewGrade("");
+      setNewLessonSlots(activeLesson);
+
+      // Mavjud draft baholarini saqlagan holda yangi o'quvchilar ro'yxatini yuklash
+      const data = await apiRequest(`/api/grades?date=${selectedDate}&lesson=${activeLesson}`);
+      if (Array.isArray(data)) {
+        setGradesList(data);
+        const initM = {};
+        for (const item of data) {
+          initM[item.student_id] = {
+            value: item.value,
+            status: item.status,
+            late_minutes: item.late_minutes
+          };
+        }
+        setInitialMap((prevInit) => ({ ...initM, ...prevInit }));
+        setDraftMap((prevDraft) => ({ ...initM, ...prevDraft }));
+      }
+    } catch (err) {
+      showToast(err.message || "O'quvchi qo'shishda xatolik", "error");
+    } finally {
+      setIsAddingStudent(false);
     }
   };
 
@@ -305,16 +382,38 @@ export function Grading({ lesson: initialLesson = 1 }) {
         {/* Sarlavha va oy tanlash */}
         <div class="grading-header-row">
           <h2 class="home-title" style={{ margin: 0 }}>Baholash</h2>
-          <button
-            type="button"
-            class="month-picker-btn"
-            onClick={() => setMonthSheetOpen(true)}
-          >
-            <span>{monthName} {currentYearNum}</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button
+              type="button"
+              class="add-student-quick-btn"
+              onClick={() => {
+                setNewLessonSlots(activeLesson);
+                setAddStudentSheetOpen(true);
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>+ O'quvchi</span>
+            </button>
+            <button
+              type="button"
+              class="month-picker-btn"
+              onClick={() => {
+                if (hasChanges) {
+                  showToast("Avval o'zgarishlarni saqlang", "warn");
+                  return;
+                }
+                setMonthSheetOpen(true);
+              }}
+            >
+              <span>{monthName} {currentYearNum}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* 5 kunlik hafta lentasi (B7) */}
@@ -322,6 +421,11 @@ export function Grading({ lesson: initialLesson = 1 }) {
           selectedDate={selectedDate}
           todayDate={todayDate}
           onSelectDate={(newDate) => {
+            if (newDate === selectedDate) return;
+            if (hasChanges) {
+              showToast("Avval o'zgarishlarni saqlang", "warn");
+              return;
+            }
             setSelectedDate(newDate);
             setExpandedStudentId(null);
           }}
@@ -334,6 +438,11 @@ export function Grading({ lesson: initialLesson = 1 }) {
               type="button"
               class={`grading-lesson-pill ${activeLesson === 1 ? "active" : ""}`}
               onClick={() => {
+                if (activeLesson === 1) return;
+                if (hasChanges) {
+                  showToast("Avval o'zgarishlarni saqlang", "warn");
+                  return;
+                }
                 setActiveLesson(1);
                 setExpandedStudentId(null);
               }}
@@ -344,6 +453,11 @@ export function Grading({ lesson: initialLesson = 1 }) {
               type="button"
               class={`grading-lesson-pill ${activeLesson === 2 ? "active" : ""}`}
               onClick={() => {
+                if (activeLesson === 2) return;
+                if (hasChanges) {
+                  showToast("Avval o'zgarishlarni saqlang", "warn");
+                  return;
+                }
                 setActiveLesson(2);
                 setExpandedStudentId(null);
               }}
@@ -605,6 +719,84 @@ export function Grading({ lesson: initialLesson = 1 }) {
         </form>
       </Sheet>
 
+      {/* O'quvchi qo'shish Sheet */}
+      <Sheet
+        isOpen={addStudentSheetOpen}
+        onClose={() => setAddStudentSheetOpen(false)}
+        title="O'quvchi qo'shish"
+      >
+        <form class="start-lesson-form" onSubmit={handleAddStudent}>
+          <div class="form-group">
+            <label class="form-label">Ism *</label>
+            <input
+              type="text"
+              class="form-input"
+              placeholder="Ism"
+              value={newFirstName}
+              onInput={(e) => setNewFirstName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Familya</label>
+            <input
+              type="text"
+              class="form-input"
+              placeholder="Familya"
+              value={newLastName}
+              onInput={(e) => setNewLastName(e.target.value)}
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Sinf</label>
+            <input
+              type="text"
+              class="form-input"
+              placeholder="Masalan: 8-A"
+              value={newGrade}
+              onInput={(e) => setNewGrade(e.target.value)}
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Qaysi darsga *</label>
+            <div class="slot-selection-chips">
+              <button
+                type="button"
+                class={`slot-select-btn ${newLessonSlots === 1 ? "active" : ""}`}
+                onClick={() => setNewLessonSlots(1)}
+              >
+                1-dars
+              </button>
+              <button
+                type="button"
+                class={`slot-select-btn ${newLessonSlots === 2 ? "active" : ""}`}
+                onClick={() => setNewLessonSlots(2)}
+              >
+                2-dars
+              </button>
+              <button
+                type="button"
+                class={`slot-select-btn ${newLessonSlots === 3 ? "active" : ""}`}
+                onClick={() => setNewLessonSlots(3)}
+              >
+                Ikkalasi
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            class="start-lesson-btn"
+            disabled={isAddingStudent || !newFirstName.trim()}
+          >
+            {isAddingStudent ? "Qo'shilmoqda..." : "Qo'shish"}
+          </button>
+        </form>
+      </Sheet>
+
       {/* Oy tanlash Sheet */}
       <MonthSheet
         isOpen={monthSheetOpen}
@@ -612,6 +804,10 @@ export function Grading({ lesson: initialLesson = 1 }) {
         currentYear={currentYearNum}
         selectedMonth={currentMonthNum}
         onSelectMonth={(monthNum, yearNum) => {
+          if (hasChanges) {
+            showToast("Avval o'zgarishlarni saqlang", "warn");
+            return;
+          }
           const mStr = String(monthNum).padStart(2, "0");
           // Oyning birinchi dushanbasiga yoki 1-kuniga o'tish
           const newD = `${yearNum}-${mStr}-01`;

@@ -1,6 +1,7 @@
 import { backButton, showConfirm, closeApp } from "./lib/tg.js";
 import { apiRequest } from "./lib/api.js";
 import { hasUnsavedChanges } from "./store/gradingDraft.js";
+import { showToast } from "./components/Toast.jsx";
 
 const MAIN_TABS = ["home", "students", "grades", "settings"];
 
@@ -24,6 +25,10 @@ export function parseHash(hash) {
 }
 
 export function navigate(path, { replace = false } = {}) {
+  if (hasUnsavedChanges()) {
+    showToast("Avval o'zgarishlarni saqlang", "warn");
+    return;
+  }
   const newHash = path.startsWith("#") ? path : `#${path}`;
   if (replace) {
     window.location.replace(newHash);
@@ -35,8 +40,8 @@ export function navigate(path, { replace = false } = {}) {
 export async function handleBack() {
   // 1. Saqlanmagan o'zgarishlar bormi?
   if (hasUnsavedChanges()) {
-    const discard = await showConfirm("Saqlanmagan o'zgarishlar bor. Bekor qilinsinmi?");
-    if (!discard) return;
+    showToast("Avval o'zgarishlarni saqlang", "warn");
+    return;
   }
 
   const { page } = currentRoute;
