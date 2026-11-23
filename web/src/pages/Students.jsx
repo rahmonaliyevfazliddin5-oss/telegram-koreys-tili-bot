@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "preact/hooks";
 import { apiRequest } from "../lib/api.js";
-import { formatName, matchStudentSearch } from "../lib/format.js";
+import { formatName, formatMoney, matchStudentSearch } from "../lib/format.js";
 import { showToast } from "../components/Toast.jsx";
 import { navigate } from "../router.js";
 import { Avatar } from "../components/Avatar.jsx";
@@ -76,9 +76,11 @@ export function Students() {
   const filteredStudents = useMemo(() => {
     return students
       .filter((s) => {
-        // 1. Sinf yoki Belgilanmagan filtri
+        // 1. Sinf, Qarzdorlar yoki Belgilanmagan filtri
         if (selectedGrade === "unset_slot") {
           if (s.lesson_slots !== null && s.lesson_slots !== undefined) return false;
+        } else if (selectedGrade === "debtors") {
+          if (!s.debt || s.debt <= 0) return false;
         } else if (selectedGrade !== null) {
           if (s.grade !== selectedGrade) return false;
         }
@@ -295,6 +297,15 @@ export function Students() {
         >
           Belgilanmagan
         </button>
+
+        {/* Qarzdor o'quvchilar filtri */}
+        <button
+          type="button"
+          class={`filter-chip ${selectedGrade === "debtors" ? "active" : ""}`}
+          onClick={() => setSelectedGrade("debtors")}
+        >
+          Qarzdorlar
+        </button>
       </div>
 
       {/* Alohida satrda Jami soni */}
@@ -351,19 +362,42 @@ export function Students() {
                       {renderSlotBadge(student.lesson_slots)}
                     </div>
 
-                    {student.grade && student.grade.trim() ? (
-                      <span class="student-grade-chip">
-                        {student.grade.trim()}-sinf
-                      </span>
-                    ) : null}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                      {student.grade && student.grade.trim() ? (
+                        <span class="student-grade-chip">
+                          {student.grade.trim()}-sinf
+                        </span>
+                      ) : null}
+                      {student.parent_phone ? (
+                        <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                          {student.parent_phone}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
-                {score !== undefined && !isSelectMode && (
-                  <span class="student-score-badge">
-                    {score} ball
-                  </span>
-                )}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                  {student.debt > 0 && !isSelectMode && (
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        color: "#dc2626",
+                        background: "rgba(220, 38, 38, 0.1)",
+                        padding: "2px 6px",
+                        borderRadius: "6px"
+                      }}
+                    >
+                      {formatMoney(student.debt)} qarz
+                    </span>
+                  )}
+                  {score !== undefined && !isSelectMode && (
+                    <span class="student-score-badge">
+                      {score} ball
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })

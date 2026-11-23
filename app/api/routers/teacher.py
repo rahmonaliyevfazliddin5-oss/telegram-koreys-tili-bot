@@ -8,7 +8,10 @@ from sqlalchemy import select, func, and_
 from app.database import get_db
 from app.api.deps import get_current_admin
 from app.models.lesson import Lesson
-from app.models.exam import Exam
+from app.models.exam import Exam, ExamGrade
+from app.models.grade import Grade
+from app.models.attendance import AttendanceMark
+from app.models.lesson_absence import LessonAbsence
 from app.schemas.teacher import (
     TeacherProfileResponse,
     TeacherDayCard,
@@ -92,7 +95,27 @@ async def get_teacher_profile(
     )
     lessons_res = await db.execute(lessons_stmt)
     month_lessons = lessons_res.scalars().all()
-    lessons_map = {(l.date, l.lesson_no): l.topic for l in month_lessons}
+    lessons_dict = {(l.date, l.lesson_no): l for l in month_lessons}
+
+    # Shu oydagi baholarni olish
+    grades_stmt = select(Grade).where(
+        and_(
+            Grade.date >= start_date,
+            Grade.date <= end_date
+        )
+    )
+    grades_res = await db.execute(grades_stmt)
+    month_grades = grades_res.scalars().all()
+
+    # Shu oydagi davomat belgilarini olish
+    att_stmt = select(AttendanceMark).where(
+        and_(
+            AttendanceMark.date >= start_date,
+            AttendanceMark.date <= end_date
+        )
+    )
+    att_res = await db.execute(att_stmt)
+    month_att = att_res.scalars().all()
 
     # Shu oydagi imtihonlarni olish
     exams_stmt = select(Exam).where(
@@ -103,6 +126,31 @@ async def get_teacher_profile(
     ).order_by(Exam.date.desc(), Exam.lesson_no.asc(), Exam.id.desc())
     exams_res = await db.execute(exams_stmt)
     month_exams = exams_res.scalars().all()
+    exam_ids = [e.id for e in month_exams]
+
+    exam_grades_map = {}
+    if exam_ids:
+        eg_stmt = select(ExamGrade).where(ExamGrade.exam_id.in_(exam_ids))
+        eg_res = await db.execute(eg_stmt)
+        for eg in eg_res.scalars().all():
+            exam_grades_map.setdefault(eg.exam_id, []).append(eg.value)
+
+    # Darslar bo'yicha hisoblar
+    lesson_stats = {}
+    for g in month_grades:
+        key = (g.date, g.lesson_no)
+        st = lesson_stats.setdefault(key, {"graded": set(), "attended": set(), "absent": set()})
+        if g.value is not None:
+            st["graded"].add(g.student_id)
+            st["attended"].add(g.student_id)
+
+    for a in month_att:
+        key = (a.date, a.lesson_no)
+        st = lesson_stats.setdefault(key, {"graded": set(), "attended": set(), "absent": set()})
+        if a.status in ("present", "late"):
+            st["attended"].add(a.student_id)
+        elif a.status == "absent":
+            st["absent"].add(a.student_id)
 
     # Ish kunlari (dushanba-juma) ro'yxatini shakllantirish
     workdays = []
@@ -116,27 +164,26 @@ async def get_teacher_profile(
         date_formatted = f"{cur_date.day}-{UZ_MONTHS[cur_date.month]}, {weekday_name}"
 
         day_lessons = []
-        if (cur_date, 1) in lessons_map:
-            t = lessons_map[(cur_date, 1)]
-            day_lessons.append(
-                TeacherLessonItem(
-                    lesson_no=1,
-                    time="07:00",
-                    topic=t,
-                    display=f"1-dars 07:00 — {t}"
+        for l_num, l_time in ((1, "07:00"), (2, "15:45")):
+            if (cur_date, l_num) in lessons_dict:
+                l_obj = lessons_dict[(cur_date, l_num)]
+                t = l_obj.topic
+                c_stats = lesson_stats.get((cur_date, l_num), {"graded": set(), "attended": set(), "absent": set()})
+                att_c = len(c_stats["attended"])
+                grd_c = len(c_stats["graded"])
+                abs_c = len(c_stats["absent"])
+                day_lessons.append(
+                    TeacherLessonItem(
+                        lesson_no=l_num,
+                        time=l_time,
+                        topic=t,
+                        display=f"{l_num}-dars {l_time} — {t}",
+                        attended_count=att_c,
+                        graded_count=grd_c,
+                        absent_count=abs_c,
+                        homework=l_obj.homework
+                    )
                 )
-            )
-
-        if (cur_date, 2) in lessons_map:
-            t = lessons_map[(cur_date, 2)]
-            day_lessons.append(
-                TeacherLessonItem(
-                    lesson_no=2,
-                    time="15:45",
-                    topic=t,
-                    display=f"2-dars 15:45 — {t}"
-                )
-            )
 
         has_lessons = len(day_lessons) > 0
         empty_text = None if has_lessons else "Dars o'tilmagan"
@@ -157,6 +204,9 @@ async def get_teacher_profile(
     for e in month_exams:
         w_name = UZ_WEEKDAYS.get(e.date.weekday(), "")
         d_fmt = f"{e.date.day}-{UZ_MONTHS[e.date.month]}, {w_name}"
+        scores = exam_grades_map.get(e.id, [])
+        scored_vals = [s for s in scores if s is not None]
+        avg_sc = round(sum(scored_vals) / len(scored_vals), 1) if scored_vals else None
         exam_cards.append(
             TeacherExamCard(
                 id=e.id,
@@ -164,7 +214,9 @@ async def get_teacher_profile(
                 date_formatted=d_fmt,
                 lesson_no=e.lesson_no,
                 name=e.name,
-                topic=e.topic
+                topic=e.topic,
+                attended_count=len(scored_vals),
+                avg_score=avg_sc
             )
         )
 

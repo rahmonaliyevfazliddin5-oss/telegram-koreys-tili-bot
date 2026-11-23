@@ -1,9 +1,10 @@
-from datetime import date, datetime
+from datetime import date as dt_date, datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 class ExamCreateRequest(BaseModel):
+    date: Optional[dt_date] = None
     lesson_no: int = Field(..., ge=1, le=2)
     name: str = Field(..., min_length=2, max_length=100)
     topic: str = Field(..., min_length=3, max_length=300)
@@ -18,7 +19,7 @@ class ExamResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: Optional[int] = None
-    date: date
+    date: dt_date
     lesson_no: int
     name: str
     topic: str

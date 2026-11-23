@@ -33,6 +33,7 @@ export function ExamForm() {
       await apiRequest("/api/exams", {
         method: "POST",
         body: {
+          date: examDate || today,
           lesson_no: lessonNo,
           name: cleanName,
           topic: cleanTopic

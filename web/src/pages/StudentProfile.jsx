@@ -65,8 +65,8 @@ export function StudentProfile({ id }) {
   const handleFineSubmit = async (e) => {
     e.preventDefault();
     const amountNum = parseInt(fineAmount, 10);
-    if (!amountNum || amountNum <= 0) {
-      showToast("Jarima summasini to'g'ri kiriting", "warn");
+    if (!amountNum || amountNum < 10000) {
+      showToast("Jarima summasi kamida 10 000 so'm bo'lishi kerak", "warn");
       return;
     }
 
@@ -90,8 +90,8 @@ export function StudentProfile({ id }) {
   const handleCollectSubmit = async (e) => {
     e.preventDefault();
     const amountNum = parseInt(collectAmount, 10);
-    if (!amountNum || amountNum <= 0) {
-      showToast("To'lov summasini to'g'ri kiriting", "warn");
+    if (!amountNum || amountNum < 10000) {
+      showToast("Eng kam to'lov summasi 10 000 so'm", "warn");
       return;
     }
 
@@ -147,10 +147,23 @@ export function StudentProfile({ id }) {
             <span class="profile-top-name">
               {formatName(student.last_name, student.first_name)}
             </span>
-            {student.grade && student.grade.trim() ? (
-              <span class="student-grade-chip">
-                {student.grade.trim()}-sinf
-              </span>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+              {student.grade && student.grade.trim() ? (
+                <span class="student-grade-chip">
+                  {student.grade.trim()}-sinf
+                </span>
+              ) : null}
+              {student.lesson_slots === 1 && <span class="slot-badge-chip">1-dars</span>}
+              {student.lesson_slots === 2 && <span class="slot-badge-chip">2-dars</span>}
+              {student.lesson_slots === 3 && <span class="slot-badge-chip">1+2 dars</span>}
+            </div>
+            {student.parent_phone ? (
+              <div style={{ marginTop: "6px", fontSize: "13px" }}>
+                <span style={{ color: "var(--muted)" }}>Ota-onasi: </span>
+                <a href={`tel:${student.parent_phone}`} style={{ color: "var(--brand)", fontWeight: "600", textDecoration: "none" }}>
+                  {student.parent_phone}
+                </a>
+              </div>
             ) : null}
           </div>
         </div>
@@ -229,6 +242,25 @@ export function StudentProfile({ id }) {
           }}
         >
           Qarzni yopish
+        </button>
+
+        <button
+          type="button"
+          class="btn-action-delete"
+          style={{
+            gridColumn: "span 2",
+            height: "40px",
+            background: "rgba(220, 38, 38, 0.08)",
+            color: "var(--brand, #dc2626)",
+            border: "1px solid rgba(220, 38, 38, 0.2)",
+            borderRadius: "10px",
+            fontSize: "14px",
+            fontWeight: "600",
+            cursor: "pointer"
+          }}
+          onClick={() => setDeleteModalOpen(true)}
+        >
+          O'quvchini chetlatish
         </button>
       </div>
 

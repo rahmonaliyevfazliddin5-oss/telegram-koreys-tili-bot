@@ -51,6 +51,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 1. Bazani tekshirish
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
+        try:
+            await conn.execute(text("ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_phone VARCHAR(50);"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS homework TEXT;"))
+        except Exception:
+            pass
     logger.info("PostgreSQL ulanishi muvaffaqiyatli.")
 
     # 2. Redisni tekshirish

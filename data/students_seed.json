@@ -1,186 +1,278 @@
 [
   {
     "last_name": "Odiljonov",
-    "first_name": "Biloliddin"
+    "first_name": "Biloliddin",
+    "grade": "9",
+    "parent_phone": "+998507540681"
   },
   {
     "last_name": "Maxmudov",
-    "first_name": "Faxriddin"
+    "first_name": "Faxriddin",
+    "grade": "8",
+    "parent_phone": "+998979366066"
   },
   {
     "last_name": "Ibrohimov",
-    "first_name": "Dovutbek"
+    "first_name": "Dovutbek",
+    "grade": "10",
+    "parent_phone": "+998938291547"
   },
   {
     "last_name": "Egamberdiyev",
-    "first_name": "Inomjon"
+    "first_name": "Inomjon",
+    "grade": "8",
+    "parent_phone": "+998972737071"
   },
   {
     "last_name": "Komiljonov",
-    "first_name": "Ravshanbek"
+    "first_name": "Ravshanbek",
+    "grade": "9",
+    "parent_phone": "+998999304141"
   },
   {
     "last_name": "Umaraliyev",
-    "first_name": "Umar Ali"
+    "first_name": "Umar Ali",
+    "grade": "10",
+    "parent_phone": "+998904071350"
   },
   {
     "last_name": "Xakimov",
-    "first_name": "Bexruzbek"
+    "first_name": "Bexruzbek",
+    "grade": "9",
+    "parent_phone": "+998700761350"
   },
   {
     "last_name": "Irisov",
-    "first_name": "Javohir"
+    "first_name": "Javohir",
+    "grade": "10",
+    "parent_phone": "+998942558285"
   },
   {
     "last_name": "Nematjonov",
-    "first_name": "Xasanxon"
+    "first_name": "Xasanxon",
+    "grade": "9",
+    "parent_phone": "+998905371079"
   },
   {
     "last_name": "Yo‘ldashev",
-    "first_name": "Sarvarbek"
+    "first_name": "Sarvarbek",
+    "grade": "10",
+    "parent_phone": "+998971131275"
   },
   {
     "last_name": "Abdurazzoqov",
-    "first_name": "Islombek"
+    "first_name": "Islombek",
+    "grade": "9",
+    "parent_phone": "+998882110221"
   },
   {
     "last_name": "Ortiqaliyev",
-    "first_name": "Raxmatillo"
+    "first_name": "Raxmatillo",
+    "grade": "8",
+    "parent_phone": "+998509094667"
   },
   {
     "last_name": "Abdunabiyev",
-    "first_name": "Boburjon"
+    "first_name": "Boburjon",
+    "grade": "8",
+    "parent_phone": "+998910872211"
   },
   {
     "last_name": "Alimov",
-    "first_name": "Axrorbek"
+    "first_name": "Axrorbek",
+    "grade": "10",
+    "parent_phone": "+998930860713 / +998941802390"
   },
   {
     "last_name": "Aminov",
-    "first_name": "Olimjon"
+    "first_name": "Olimjon",
+    "grade": "7",
+    "parent_phone": "+998338829030"
   },
   {
     "last_name": "Ko‘charov",
-    "first_name": "Yashinbek"
+    "first_name": "Yashinbek",
+    "grade": "8",
+    "parent_phone": "+998997178515"
   },
   {
     "last_name": "Ergashev",
-    "first_name": "Nuriddin"
+    "first_name": "Nuriddin",
+    "grade": "10",
+    "parent_phone": "+998948588368"
   },
   {
     "last_name": "",
-    "first_name": "Muxammadsodiq"
+    "first_name": "Muxammadsodiq",
+    "grade": "10",
+    "parent_phone": "+998911400167"
   },
   {
     "last_name": "Raxmatullayev",
-    "first_name": "Fazliddin"
+    "first_name": "Fazliddin",
+    "grade": "11",
+    "parent_phone": "+998916656959"
   },
   {
     "last_name": "Muxammadiyev",
-    "first_name": "Muxammadjon"
+    "first_name": "Muxammadjon",
+    "grade": "7",
+    "parent_phone": "+998936372422"
   },
   {
     "last_name": "Mo‘minov",
-    "first_name": "Suxrobbek"
+    "first_name": "Suxrobbek",
+    "grade": "10",
+    "parent_phone": "+998957430706"
   },
   {
     "last_name": "Shohobiddinova",
-    "first_name": "Farangiz"
+    "first_name": "Farangiz",
+    "grade": "7",
+    "parent_phone": "+998957451682"
   },
   {
     "last_name": "Mo‘ydinova",
-    "first_name": "Farzona"
+    "first_name": "Farzona",
+    "grade": "7",
+    "parent_phone": "+998905846888"
   },
   {
     "last_name": "Abdumalikov",
-    "first_name": "Ilmiddin"
+    "first_name": "Ilmiddin",
+    "grade": "7",
+    "parent_phone": "+998999004290"
   },
   {
     "last_name": "Shavkatov",
-    "first_name": "Raxmatillo"
+    "first_name": "Raxmatillo",
+    "grade": null,
+    "parent_phone": "+998949353935"
   },
   {
     "last_name": "Karimov",
-    "first_name": "Bexruzbek"
+    "first_name": "Bexruzbek",
+    "grade": null,
+    "parent_phone": null
   },
   {
     "last_name": "Zuhriddinov",
-    "first_name": "Azizbek"
+    "first_name": "Azizbek",
+    "grade": "8",
+    "parent_phone": "+998889888858"
   },
   {
     "last_name": "Rixsinboev",
-    "first_name": "Sardor"
+    "first_name": "Sardor",
+    "grade": "9",
+    "parent_phone": null
   },
   {
     "last_name": "Abdullayev",
-    "first_name": "Nurmuxammad"
+    "first_name": "Nurmuxammad",
+    "grade": "10",
+    "parent_phone": "+998902560783"
   },
   {
     "last_name": "Xamidullayev",
-    "first_name": "Akbarshox"
+    "first_name": "Akbarshox",
+    "grade": "10",
+    "parent_phone": "+998902037575"
   },
   {
     "last_name": "To‘lqinov",
-    "first_name": "Alisherbek"
+    "first_name": "Alisherbek",
+    "grade": "7",
+    "parent_phone": "+998772529093"
   },
   {
     "last_name": "Jumanazarov",
-    "first_name": "Shoxruxbek"
+    "first_name": "Shoxruxbek",
+    "grade": "9",
+    "parent_phone": "+998332421985"
   },
   {
     "last_name": "Yo‘ldashev",
-    "first_name": "Muxammadrizo"
+    "first_name": "Muxammadrizo",
+    "grade": "9",
+    "parent_phone": "+998951767688"
   },
   {
     "last_name": "Tojiboev",
-    "first_name": "Islombek"
+    "first_name": "Islombek",
+    "grade": "10",
+    "parent_phone": "+998951278868"
   },
   {
-    "last_name": "Xudoynazaeov",
-    "first_name": "Baxtiyorjon"
+    "last_name": "Xudoynazarov",
+    "first_name": "Baxtiyorjon",
+    "grade": "10",
+    "parent_phone": null
   },
   {
     "last_name": "Mo‘minjonov",
-    "first_name": "Jumanazar"
+    "first_name": "Jumanazar",
+    "grade": null,
+    "parent_phone": "+998770959080"
   },
   {
     "last_name": "Maxmudov",
-    "first_name": "Azamatjon"
+    "first_name": "Azamatjon",
+    "grade": "10",
+    "parent_phone": "+998331480616"
   },
   {
     "last_name": "Abduqaxxorova",
-    "first_name": "Sanobarxon"
+    "first_name": "Sanobarxon",
+    "grade": "9",
+    "parent_phone": "+998911231485"
   },
   {
     "last_name": "Mo‘ydinov",
-    "first_name": "Saydillo"
+    "first_name": "Saydillo",
+    "grade": null,
+    "parent_phone": "+998507157383"
   },
   {
     "last_name": "Inomova",
-    "first_name": "Umidaxon"
+    "first_name": "Umidaxon",
+    "grade": "10",
+    "parent_phone": null
   },
   {
     "last_name": "Soibjonova",
-    "first_name": "Ruqiyaxon"
+    "first_name": "Ruqiyaxon",
+    "grade": "9",
+    "parent_phone": null
   },
   {
     "last_name": "Tilaganboyev",
-    "first_name": "Og‘abek"
+    "first_name": "Og‘abek",
+    "grade": null,
+    "parent_phone": "+998940334784"
   },
   {
     "last_name": "Axmedov",
-    "first_name": "Javoxir"
+    "first_name": "Javoxir",
+    "grade": null,
+    "parent_phone": "+998953160145"
   },
   {
     "last_name": "Rixsitillayev",
-    "first_name": "Jaxongir"
+    "first_name": "Jaxongir",
+    "grade": "9",
+    "parent_phone": null
   },
   {
     "last_name": "Raxmatov",
-    "first_name": "Sardorbek"
+    "first_name": "Sardorbek",
+    "grade": "8",
+    "parent_phone": "+998907767682"
   },
   {
     "last_name": "Shoxobiddinov",
-    "first_name": "Shoxinur"
+    "first_name": "Shoxinur",
+    "grade": "8",
+    "parent_phone": "+998957451682"
   }
 ]

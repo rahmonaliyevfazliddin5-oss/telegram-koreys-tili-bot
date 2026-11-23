@@ -9,6 +9,7 @@ export function StudentForm({ id }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [grade, setGrade] = useState("");
+  const [parentPhone, setParentPhone] = useState("");
   const [lessonSlots, setLessonSlots] = useState(null); // 1 | 2 | 3 | null
   const [isLoading, setIsLoading] = useState(isEdit);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,6 +24,7 @@ export function StudentForm({ id }) {
           setFirstName(data.first_name || "");
           setLastName(data.last_name || "");
           setGrade(data.grade || "");
+          setParentPhone(data.parent_phone || "");
           setLessonSlots(data.lesson_slots || null);
         }
       })
@@ -44,6 +46,7 @@ export function StudentForm({ id }) {
     const cleanFirst = firstName.trim();
     const cleanLast = lastName.trim();
     const cleanGrade = grade.trim();
+    const cleanPhone = parentPhone.trim();
 
     if (!cleanFirst) {
       showToast("Ismni kiriting", "warn");
@@ -65,6 +68,7 @@ export function StudentForm({ id }) {
             first_name: cleanFirst,
             last_name: cleanLast || null,
             grade: cleanGrade || null,
+            parent_phone: cleanPhone || null,
             lesson_slots: lessonSlots
           }
         });
@@ -76,6 +80,7 @@ export function StudentForm({ id }) {
             first_name: cleanFirst,
             last_name: cleanLast || null,
             grade: cleanGrade || null,
+            parent_phone: cleanPhone || null,
             lesson_slots: lessonSlots
           }
         });
@@ -141,6 +146,17 @@ export function StudentForm({ id }) {
             placeholder="Masalan: 8 yoki 8-A"
             value={grade}
             onInput={(e) => setGrade(e.target.value)}
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ota-onasi telefon raqami</label>
+          <input
+            type="tel"
+            class="form-input"
+            placeholder="Masalan: +998901234567"
+            value={parentPhone}
+            onInput={(e) => setParentPhone(e.target.value)}
           />
         </div>
 

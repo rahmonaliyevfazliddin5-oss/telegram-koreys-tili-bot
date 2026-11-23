@@ -194,6 +194,9 @@ async def bulk_save_grades(
             detail="Avval dars mavzusini kiriting"
         )
 
+    if payload.homework is not None:
+        lesson_obj.homework = payload.homework
+
     items = payload.items or []
 
     # 0. Darsga biriktirilganlik validatsiyasi (boshqa darsga tegishli bo'lsa 422)

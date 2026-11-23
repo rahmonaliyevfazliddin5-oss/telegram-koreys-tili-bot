@@ -52,8 +52,18 @@ export async function apiRequest(endpoint, options = {}) {
     ...(options.headers || {})
   };
 
+  const fetchOptions = { ...options, headers };
+  if (
+    fetchOptions.body &&
+    typeof fetchOptions.body === "object" &&
+    !(fetchOptions.body instanceof FormData) &&
+    !(fetchOptions.body instanceof Blob)
+  ) {
+    fetchOptions.body = JSON.stringify(fetchOptions.body);
+  }
+
   try {
-    const response = await fetch(endpoint, { ...options, headers });
+    const response = await fetch(endpoint, fetchOptions);
 
     if (response.status === 204) {
       return null;

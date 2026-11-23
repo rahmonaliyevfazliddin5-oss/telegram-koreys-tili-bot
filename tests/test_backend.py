@@ -117,9 +117,10 @@ def test_students_seed_json_integrity():
 
     assert len(data) == 46
     for item in data:
-        assert set(item.keys()) == {"last_name", "first_name"}
-        assert "grade" not in item
-        assert "phone" not in item
+        assert "last_name" in item
+        assert "first_name" in item
+        assert "grade" in item
+        assert "parent_phone" in item
 
     mux = next(d for d in data if d["first_name"] == "Muxammadsodiq")
     assert mux["last_name"] == ""

@@ -76,7 +76,8 @@ async def get_students(
                 or_(
                     Student.first_name.ilike(search_pattern),
                     Student.last_name.ilike(search_pattern),
-                    Student.grade.ilike(search_pattern)
+                    Student.grade.ilike(search_pattern),
+                    Student.parent_phone.ilike(search_pattern)
                 )
             )
     stmt = stmt.order_by(
@@ -84,7 +85,32 @@ async def get_students(
         Student.first_name.asc()
     ).offset(offset).limit(limit)
     result = await db.execute(stmt)
-    return result.scalars().all()
+    students = result.scalars().all()
+    if not students:
+        return []
+
+    student_ids = [s.id for s in students]
+    fines_stmt = select(FineLedger.student_id, FineLedger.type, func.coalesce(func.sum(FineLedger.amount), 0)).where(
+        FineLedger.student_id.in_(student_ids)
+    ).group_by(FineLedger.student_id, FineLedger.type)
+    ledger_res = await db.execute(fines_stmt)
+
+    debt_map = {}
+    for sid, ltype, total in ledger_res.all():
+        debt_map.setdefault(sid, {"fines": 0, "payments": 0})
+        if ltype == "fine":
+            debt_map[sid]["fines"] = total
+        elif ltype == "payment":
+            debt_map[sid]["payments"] = total
+
+    response = []
+    for s in students:
+        dm = debt_map.get(s.id, {"fines": 0, "payments": 0})
+        debt_val = max(0, int(dm["fines"] - dm["payments"]))
+        item = StudentResponse.model_validate(s)
+        item.debt = debt_val
+        response.append(item)
+    return response
 
 
 @router.get("/rating")
@@ -201,6 +227,7 @@ async def get_student_profile(
         "first_name": student.first_name,
         "last_name": student.last_name or "",
         "grade": student.grade,
+        "parent_phone": student.parent_phone,
         "lesson_slots": student.lesson_slots
     }
 
@@ -218,6 +245,7 @@ async def get_student_profile(
         "first_name": student.first_name,
         "last_name": student.last_name or "",
         "grade": student.grade,
+        "parent_phone": student.parent_phone,
         "lesson_slots": student.lesson_slots,
         "total_absences": int(total_absences),
         "total_lates": int(total_lates),
@@ -405,6 +433,7 @@ async def create_student(
         first_name=payload.first_name.strip(),
         last_name=payload.last_name.strip() if payload.last_name else "",
         grade=payload.grade.strip() if payload.grade else None,
+        parent_phone=payload.parent_phone.strip() if payload.parent_phone else None,
         lesson_slots=payload.lesson_slots
     )
     db.add(student)
@@ -436,6 +465,8 @@ async def update_student(
     student.first_name = payload.first_name.strip()
     student.last_name = payload.last_name.strip() if payload.last_name else ""
     student.grade = payload.grade.strip() if payload.grade else None
+    if payload.parent_phone is not None:
+        student.parent_phone = payload.parent_phone.strip() if payload.parent_phone else None
     if payload.lesson_slots is not None:
         if payload.lesson_slots not in (1, 2, 3):
             raise HTTPException(

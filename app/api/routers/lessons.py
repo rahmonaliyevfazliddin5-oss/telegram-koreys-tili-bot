@@ -15,6 +15,7 @@ router = APIRouter()
 
 
 @router.post("/start", response_model=LessonResponse)
+@router.post("", response_model=LessonResponse)
 async def start_lesson(
     payload: LessonStartRequest,
     admin: Dict[str, Any] = Depends(get_current_admin),
@@ -41,11 +42,14 @@ async def start_lesson(
 
     if lesson:
         lesson.topic = payload.topic
+        if payload.homework is not None:
+            lesson.homework = payload.homework
     else:
         lesson = Lesson(
             date=today,
             lesson_no=payload.lesson_no,
             topic=payload.topic,
+            homework=payload.homework,
             started_at=now,
             updated_at=now
         )
@@ -81,6 +85,8 @@ async def update_lesson_topic(
         )
 
     lesson.topic = payload.topic
+    if payload.homework is not None:
+        lesson.homework = payload.homework
     await db.commit()
     await db.refresh(lesson)
     await invalidate_all_caches()

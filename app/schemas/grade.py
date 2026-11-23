@@ -14,6 +14,7 @@ class GradesBulkUpdate(BaseModel):
     date: date
     lesson: int = Field(1, ge=1, le=2)
     kind: Optional[str] = "daily"
+    homework: Optional[str] = None
     grades: Optional[List[GradeItem]] = None
     items: Optional[List[GradeItem]] = None
 

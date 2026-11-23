@@ -12,6 +12,7 @@ class Lesson(Base):
     date: Mapped[date] = mapped_column(Date, nullable=False)
     lesson_no: Mapped[int] = mapped_column(SmallInteger, nullable=False)  # 1 | 2
     topic: Mapped[str] = mapped_column(Text, nullable=False)
+    homework: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     finalized_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

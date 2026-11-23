@@ -30,21 +30,22 @@ async def create_exam(
 ):
     now = get_tashkent_now()
     today = now.date()
+    exam_date = payload.date if payload.date is not None else today
 
-    if is_weekend(today):
+    if is_weekend(exam_date):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Dam olish kunida imtihon ochish taqiqlangan"
         )
 
-    if not is_lesson_window_open(payload.lesson_no, today, now.time(), now=now):
+    if not is_lesson_window_open(payload.lesson_no, exam_date, now.time(), now=now):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"{payload.lesson_no}-dars oynasi yopiq, imtihon ochish taqiqlangan"
         )
 
     exam = Exam(
-        date=today,
+        date=exam_date,
         lesson_no=payload.lesson_no,
         name=payload.name,
         topic=payload.topic,

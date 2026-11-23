@@ -8,6 +8,10 @@ class TeacherLessonItem(BaseModel):
     time: str
     topic: str
     display: str
+    attended_count: int = 0
+    graded_count: int = 0
+    absent_count: int = 0
+    homework: Optional[str] = None
 
 
 class TeacherDayCard(BaseModel):
@@ -26,6 +30,8 @@ class TeacherExamCard(BaseModel):
     lesson_no: int
     name: str
     topic: str
+    attended_count: int = 0
+    avg_score: Optional[float] = None
 
 
 class TeacherProfileResponse(BaseModel):

@@ -12,6 +12,7 @@ class Student(Base):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="")
     grade: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
+    parent_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
     lesson_slots: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -38,6 +38,8 @@ export function Grading({ lesson: initialLesson = 1 }) {
   const [isSaving, setIsSaving] = useState(false);
 
   // UI holatlari
+  const [lessonStage, setLessonStage] = useState("attendance"); // "attendance" | "grading"
+  const [homeworkInput, setHomeworkInput] = useState("");
   const [search, setSearch] = useState("");
   const [selectedGrade, setSelectedGrade] = useState(null);
   const [expandedStudentId, setExpandedStudentId] = useState(null);
@@ -187,7 +189,63 @@ export function Grading({ lesson: initialLesson = 1 }) {
   // O'quvchi qatorini bosish (akkordeon ochish/yopish)
   const handleStudentClick = (studentId) => {
     if (pageState !== "OPEN") return;
+    const cur = draftMap[studentId] || {};
+    if (lessonStage === "grading" && cur.status === "absent") {
+      showToast("O'quvchi kelmagan, baholab bo'lmaydi", "warn");
+      return;
+    }
     setExpandedStudentId((prev) => (prev === studentId ? null : studentId));
+  };
+
+  // Davomatda (-) Kelmadi holatini o'zgartirish
+  const handleToggleAbsent = (studentId) => {
+    setDraftMap((prev) => {
+      const cur = prev[studentId] || {};
+      const isAbsent = cur.status === "absent";
+      return {
+        ...prev,
+        [studentId]: {
+          ...cur,
+          status: isAbsent ? "present" : "absent",
+          value: isAbsent ? cur.value : null,
+          late_minutes: isAbsent ? cur.late_minutes : null
+        }
+      };
+    });
+  };
+
+  // Davomatni saqlash va Baholash bosqichiga o'tish
+  const handleSaveAttendance = async () => {
+    setIsSaving(true);
+    try {
+      const items = gradesList.map((s) => {
+        const cur = draftMap[s.student_id] || { value: null, status: "present", late_minutes: null };
+        return {
+          student_id: s.student_id,
+          value: cur.value,
+          status: cur.status || "present",
+          late_minutes: cur.late_minutes
+        };
+      });
+
+      await apiRequest("/api/grades", {
+        method: "PUT",
+        body: {
+          date: selectedDate,
+          lesson: activeLesson,
+          items
+        }
+      });
+
+      showToast("Davomat saqlandi, baholashga o'tildi", "success");
+      setInitialMap({ ...draftMap });
+      setUnsavedChanges(false);
+      setLessonStage("grading");
+    } catch (err) {
+      showToast(err.message || "Davomatni saqlashda xatolik", "error");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Baho tanlash (1..5)
@@ -195,7 +253,7 @@ export function Grading({ lesson: initialLesson = 1 }) {
     setDraftMap((prev) => {
       const cur = prev[studentId] || {};
       const newVal = cur.value === val ? null : val;
-      const newStatus = newVal !== null ? "present" : cur.late_minutes ? "late" : "absent";
+      const newStatus = newVal !== null ? "present" : cur.late_minutes ? "late" : "present";
       return {
         ...prev,
         [studentId]: {
@@ -214,7 +272,7 @@ export function Grading({ lesson: initialLesson = 1 }) {
       ...prev,
       [studentId]: {
         value: null,
-        status: "absent",
+        status: "present",
         late_minutes: null
       }
     }));
@@ -249,9 +307,8 @@ export function Grading({ lesson: initialLesson = 1 }) {
     setLateSheetStudent(null);
   };
 
-  // Saqlash (Bulk Save)
+  // Saqlash (Bulk Save - Baholar va Uy ishi)
   const handleSaveAll = async () => {
-    if (!hasChanges || isSaving) return;
     setIsSaving(true);
     try {
       const items = gradesList.map((s) => {
@@ -259,7 +316,7 @@ export function Grading({ lesson: initialLesson = 1 }) {
         return {
           student_id: s.student_id,
           value: cur.value,
-          status: cur.status,
+          status: cur.status || "present",
           late_minutes: cur.late_minutes
         };
       });
@@ -269,15 +326,15 @@ export function Grading({ lesson: initialLesson = 1 }) {
         body: {
           date: selectedDate,
           lesson: activeLesson,
+          homework: homeworkInput.trim() || null,
           items
         }
       });
 
-      showToast("Baholar saqlandi", "success");
+      showToast("Baholar va dars saqlandi", "success");
       setInitialMap({ ...draftMap });
       setUnsavedChanges(false);
       await fetchStatus();
-      // Requirement 1: mini app dagi saqlash tugmasini bosgandi darslar avtomatk oqituvchi profiliga otsin
       navigate("teacher");
     } catch (err) {
       showToast(err.message || "Saqlashda xatolik yuz berdi", "error");
@@ -471,6 +528,45 @@ export function Grading({ lesson: initialLesson = 1 }) {
             Baho qo'yilgan: {gradedCount} / {gradesList.length}
           </span>
         </div>
+
+        {currentLessonInfo?.topic && (
+          <div style={{ margin: "8px 0 2px", padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <span style={{ fontSize: "11px", color: "var(--muted)", display: "block" }}>Mavzu:</span>
+              <span style={{ fontSize: "13px", fontWeight: "600" }}>{currentLessonInfo.topic}</span>
+            </div>
+            <button
+              type="button"
+              class="btn-link"
+              style={{ fontSize: "12px", color: "var(--brand)" }}
+              onClick={() => {
+                setTopicInput(currentLessonInfo.topic);
+                setStartLessonSheetOpen(true);
+              }}
+            >
+              Tahrirlash
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+          <button
+            type="button"
+            class={`filter-chip ${lessonStage === "attendance" ? "active" : ""}`}
+            style={{ flex: 1, height: "36px", justifyContent: "center", fontWeight: "600" }}
+            onClick={() => setLessonStage("attendance")}
+          >
+            1. Davomat
+          </button>
+          <button
+            type="button"
+            class={`filter-chip ${lessonStage === "grading" ? "active" : ""}`}
+            style={{ flex: 1, height: "36px", justifyContent: "center", fontWeight: "600" }}
+            onClick={() => setLessonStage("grading")}
+          >
+            2. Baholash
+          </button>
+        </div>
       </div>
 
       {/* Holat kartalari (B6) */}
@@ -546,11 +642,16 @@ export function Grading({ lesson: initialLesson = 1 }) {
           filteredStudents.map((student) => {
             const draft = draftMap[student.student_id] || {};
             const val = draft.value;
+            const isAbsent = draft.status === "absent";
             const isLate = draft.status === "late";
             const isExpanded = expandedStudentId === student.student_id;
 
             return (
-              <div key={student.student_id} class="grading-student-wrapper">
+              <div
+                key={student.student_id}
+                class="grading-student-wrapper"
+                style={lessonStage === "grading" && isAbsent ? { opacity: 0.5, filter: "grayscale(0.7)" } : {}}
+              >
                 {/* Asosiy qator (B12: ism 2 qatorga ruxsat, o'ng blok <= 112px) */}
                 <div
                   class="grading-student-row"
@@ -573,7 +674,51 @@ export function Grading({ lesson: initialLesson = 1 }) {
                   </div>
 
                   <div class="grading-student-right">
-                    {val !== null && val !== undefined ? (
+                    {lessonStage === "attendance" ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleAbsent(student.student_id);
+                          }}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "16px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                            border: isAbsent ? "none" : "1px solid var(--border)",
+                            background: isAbsent ? "var(--brand, #dc2626)" : "rgba(0,0,0,0.06)",
+                            color: isAbsent ? "#ffffff" : "var(--text)"
+                          }}
+                        >
+                          {isAbsent ? "Kelmadi (-)" : "(-) Kelmadi"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenLateSheet(student.student_id);
+                          }}
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: "16px",
+                            fontSize: "11px",
+                            cursor: "pointer",
+                            border: "1px solid var(--border)",
+                            background: isLate ? "rgba(234, 88, 12, 0.15)" : "var(--surface)",
+                            color: isLate ? "#ea580c" : "var(--muted)"
+                          }}
+                        >
+                          {isLate ? `+${draft.late_minutes} daq` : "Kech"}
+                        </button>
+                      </div>
+                    ) : isAbsent ? (
+                      <span class="grade-absent-chip" style={{ background: "rgba(220, 38, 38, 0.1)", color: "#dc2626", fontWeight: "600" }}>
+                        Kelmadi
+                      </span>
+                    ) : val !== null && val !== undefined ? (
                       <span class={`grade-val-chip val-${val}`}>{val}</span>
                     ) : isLate ? (
                       <span class="grade-late-chip">
@@ -587,8 +732,8 @@ export function Grading({ lesson: initialLesson = 1 }) {
                   </div>
                 </div>
 
-                {/* Inline akkordeon (faqat dars ochiq bo'lsa va bosilgan bo'lsa) */}
-                {isExpanded && pageState === "OPEN" && (
+                {/* Inline akkordeon (faqat dars ochiq bo'lsa, kelgan bo'lsa va bosilgan bo'lsa) */}
+                {isExpanded && pageState === "OPEN" && !isAbsent && (
                   <div class="grading-accordion-panel">
                     <div class="grade-buttons-row">
                       {[1, 2, 3, 4, 5].map((num) => (
@@ -634,14 +779,29 @@ export function Grading({ lesson: initialLesson = 1 }) {
         )}
       </div>
 
+      {lessonStage === "grading" && pageState === "OPEN" && (
+        <div class="form-group" style={{ margin: "16px 0 70px" }}>
+          <label class="form-label" style={{ fontWeight: "600", fontSize: "14px" }}>
+            Mavzu haqida uy ishi (o'qituvchi o'zi uchun eslatma)
+          </label>
+          <textarea
+            class="form-input"
+            style={{ minHeight: "80px", resize: "vertical", width: "100%", boxSizing: "border-box" }}
+            placeholder="Masalan: 45-mashq, yangi lug'atlarni yodlash..."
+            value={homeworkInput}
+            onInput={(e) => setHomeworkInput(e.target.value)}
+          />
+        </div>
+      )}
+
       {/* Yagona Saqlash paneli (SaveDock) - Tab ustiga qadalgan (B4) */}
       {pageState === "OPEN" && (
         <SaveDock
           visible={true}
-          disabled={!hasChanges}
+          disabled={false}
           loading={isSaving}
-          text={hasChanges ? "Saqlash" : "O'zgarishlar yo'q"}
-          onSave={handleSaveAll}
+          text={lessonStage === "attendance" ? "Davomatni saqlash va Baholashga o'tish" : "Saqlash va Profilga o'tish"}
+          onSave={lessonStage === "attendance" ? handleSaveAttendance : handleSaveAll}
         />
       )}
 

@@ -6,10 +6,12 @@ from pydantic import BaseModel, Field, ConfigDict
 class LessonStartRequest(BaseModel):
     lesson_no: int = Field(..., ge=1, le=2)
     topic: str = Field(..., min_length=3, max_length=300)
+    homework: Optional[str] = None
 
 
 class LessonUpdateRequest(BaseModel):
     topic: str = Field(..., min_length=3, max_length=300)
+    homework: Optional[str] = None
 
 
 class LessonResponse(BaseModel):
@@ -19,5 +21,6 @@ class LessonResponse(BaseModel):
     date: date
     lesson_no: int
     topic: str
+    homework: Optional[str] = None
     started_at: datetime
     updated_at: datetime

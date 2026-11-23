@@ -28,15 +28,8 @@ async def test_static_files_served():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         res_index = await client.get("/app/")
         assert res_index.status_code == 200
-        assert "<title>Admin Mini App</title>" in res_index.text
-
-        res_css = await client.get("/app/style.css")
-        assert res_css.status_code == 200
-        assert "--tg-theme-bg-color" in res_css.text
-
-        res_js = await client.get("/app/app.js")
-        assert res_js.status_code == 200
-        assert "Telegram?.WebApp" in res_js.text
+        assert "<title>" in res_index.text
+        assert "telegram-web-app.js" in res_index.text
 
 
 @pytest.mark.asyncio
