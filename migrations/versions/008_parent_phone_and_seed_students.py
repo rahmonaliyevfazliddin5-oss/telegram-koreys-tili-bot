@@ -21,6 +21,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     conn = op.get_bind()
+    try:
+        conn.execute(sa.text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)"))
+    except Exception:
+        pass
     inspector = sa.inspect(conn)
     tables = set(inspector.get_table_names())
 
