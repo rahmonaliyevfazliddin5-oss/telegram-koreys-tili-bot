@@ -23,7 +23,8 @@ from app.bot.keyboards.user_kb import (
     get_language_keyboard,
     get_main_menu_keyboard,
     get_students_pagination_keyboard,
-    get_rating_pagination_keyboard
+    get_rating_pagination_keyboard,
+    get_portal_webapp_keyboard
 )
 from app.services.rating_service import calculate_and_cache_rating
 from app.services.cache_service import get_cached_sources, set_cached_sources
@@ -115,6 +116,23 @@ async def process_language_choice(callback: CallbackQuery):
     await callback.message.answer(
         format_main_menu_text(selected_lang),
         reply_markup=get_main_menu_keyboard(selected_lang, titles)
+    )
+
+
+@router.message(F.text.in_([
+    get_text("user_miniapp_btn", "uz"),
+    get_text("user_miniapp_btn", "en"),
+    get_text("user_miniapp_btn", "ru"),
+    "Mini ilova", "Mini App", "mini app"
+]))
+@router.message(Command("miniapp"))
+@router.message(Command("app"))
+async def open_user_miniapp(message: Message, lang: Optional[str] = None):
+    user_lang = lang or "uz"
+    prompt = get_text("user_miniapp_prompt", user_lang)
+    await message.answer(
+        prompt,
+        reply_markup=get_portal_webapp_keyboard(user_lang)
     )
 
 

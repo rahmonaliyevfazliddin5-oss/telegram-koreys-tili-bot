@@ -148,7 +148,25 @@ export function Home() {
     <div class="home-page">
       {/* 1. Sarlavha qatori */}
       <div class="home-header-row">
-        <h2 class="home-title">Bosh sahifa</h2>
+        <div>
+          <h2 class="home-title">Bosh sahifa</h2>
+          <button
+            style={{
+              background: "#1E293B",
+              color: "#FDE68A",
+              border: "1px solid rgba(245, 158, 11, 0.4)",
+              borderRadius: "6px",
+              fontSize: "11px",
+              fontWeight: "600",
+              padding: "3px 8px",
+              cursor: "pointer",
+              marginTop: "4px"
+            }}
+            onClick={() => navigate("portal")}
+          >
+            Ota-onalar portali
+          </button>
+        </div>
         <div class="home-header-right">
           <div class="home-clock-chip" title="Server vaqti">
             {clockTime}

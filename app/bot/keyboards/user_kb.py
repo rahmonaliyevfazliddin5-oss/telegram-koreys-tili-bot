@@ -3,8 +3,10 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     ReplyKeyboardMarkup,
-    KeyboardButton
+    KeyboardButton,
+    WebAppInfo
 )
+from app.config import settings
 from app.i18n.texts import get_text
 
 
@@ -24,8 +26,11 @@ def get_main_menu_keyboard(lang: str = "uz", resource_titles: Optional[List[str]
     attendance_text = get_text("attendance_btn", lang)
     teacher_text = get_text("teacher_btn", lang)
     contact_text = get_text("contact_btn", lang)
+    miniapp_text = get_text("user_miniapp_btn", lang)
+    portal_url = f"{settings.WEBAPP_URL}/app#/portal"
 
     keyboard = [
+        [KeyboardButton(text=miniapp_text, web_app=WebAppInfo(url=portal_url))],
         [KeyboardButton(text=rating_text), KeyboardButton(text=students_text)],
         [KeyboardButton(text=attendance_text), KeyboardButton(text=teacher_text)],
         [KeyboardButton(text=contact_text)]
@@ -39,6 +44,21 @@ def get_main_menu_keyboard(lang: str = "uz", resource_titles: Optional[List[str]
         keyboard=keyboard,
         resize_keyboard=True,
         is_persistent=True
+    )
+
+
+def get_portal_webapp_keyboard(lang: str = "uz") -> InlineKeyboardMarkup:
+    btn_text = get_text("user_miniapp_btn", lang)
+    webapp_url = f"{settings.WEBAPP_URL}/app#/portal"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=btn_text,
+                    web_app=WebAppInfo(url=webapp_url)
+                )
+            ]
+        ]
     )
 
 

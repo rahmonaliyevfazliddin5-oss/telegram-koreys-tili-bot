@@ -10,10 +10,14 @@ const historyStack = [];
 const routeListeners = new Set();
 
 export function parseHash(hash) {
-  const clean = (hash || window.location.hash || "#home").replace(/^#\/?/, "");
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get("mode");
+  const defaultPage = mode === "portal" ? "portal" : "home";
+
+  const clean = (hash || window.location.hash || `#${defaultPage}`).replace(/^#\/?/, "");
   const [pageWithParams, ...rest] = clean.split("?");
   const parts = pageWithParams.split("/");
-  const page = parts[0] || "home";
+  const page = parts[0] || defaultPage;
   const id = parts[1] || null;
 
   const query = {};
@@ -45,6 +49,12 @@ export async function handleBack() {
   }
 
   const { page } = currentRoute;
+
+  // 1.5. Portal sahifasida bo'lsa darhol ilovani yopish
+  if (page === "portal") {
+    closeApp();
+    return;
+  }
 
   // 2. Asosiy 4 ta tabda bo'lsa: Admin paneldan chiqish tasdig'i
   if (MAIN_TABS.includes(page)) {

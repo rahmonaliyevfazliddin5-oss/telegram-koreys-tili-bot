@@ -224,6 +224,16 @@ TEXTS: Dict[str, Dict[str, str]] = {
         "uz": "Mini App",
         "en": "Mini App",
         "ru": "Mini App"
+    },
+    "user_miniapp_btn": {
+        "uz": "Mini ilova",
+        "en": "Mini App",
+        "ru": "Мини-приложение"
+    },
+    "user_miniapp_prompt": {
+        "uz": "Ota-onalar va o'quvchilar uchun portal ilovasini ochish:",
+        "en": "Open portal app for parents and students:",
+        "ru": "Открыть портал для родителей и учеников:"
     }
 }
 

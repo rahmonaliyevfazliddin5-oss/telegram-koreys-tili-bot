@@ -21,7 +21,7 @@ from app.database import engine, get_db, async_session_maker
 from app.redis import get_redis, close_redis
 from app.bot.loader import bot, dp
 from app.api.deps import get_current_admin
-from app.api.routers import students, attendance, grades, sources, admin_auth, status, lessons, exams, teacher
+from app.api.routers import students, attendance, grades, sources, admin_auth, status, lessons, exams, teacher, portal
 from app.services.attendance_service import finalize_pending_lessons
 
 logging.basicConfig(
@@ -186,6 +186,7 @@ app.include_router(sources.router, prefix="/api/sources", tags=["Sources"])
 app.include_router(lessons.router, prefix="/api/lessons", tags=["Lessons"])
 app.include_router(exams.router, prefix="/api/exams", tags=["Exams"])
 app.include_router(teacher.router, prefix="/api/teacher", tags=["Teacher"])
+app.include_router(portal.router, prefix="/api", tags=["Portal"])
 
 
 @app.get("/api/rating", tags=["Students"])

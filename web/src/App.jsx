@@ -18,6 +18,7 @@ import { TeacherProfile } from "./pages/TeacherProfile.jsx";
 import { Settings } from "./pages/Settings.jsx";
 import { Blocked } from "./pages/Blocked.jsx";
 import { Denied } from "./pages/Denied.jsx";
+import { PortalShell } from "./portal/PortalShell.jsx";
 
 export function App() {
   const [route, setRoute] = useState({ page: "home", id: null, query: {} });
@@ -66,6 +67,10 @@ export function App() {
   };
 
   const hasDock = route.page === "grades" || route.page === "student-form" || route.page === "source-form";
+
+  if (route.page === "portal") {
+    return <PortalShell />;
+  }
 
   return (
     <AppShell currentRoute={route} hasDock={hasDock}>
