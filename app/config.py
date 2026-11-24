@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     BOT_TOKEN: str = Field(..., description="Telegram bot API tokeni")
-    ADMIN_CODE: str = Field("07070707", description="Admin kirish maxfiy kodi")
+    ADMIN_CODE: str = Field("Inson.7", description="Admin kirish maxfiy kodi")
     BOT_MODE: str = Field("polling", description="Bot ishlash rejimi (polling yoki webhook)")
     DATABASE_URL: str = Field(..., description="PostgreSQL async ulanish manzili (postgresql+asyncpg://...)")
     REDIS_URL: str = Field("redis://redis:6379/0", description="Redis ulanish manzili")

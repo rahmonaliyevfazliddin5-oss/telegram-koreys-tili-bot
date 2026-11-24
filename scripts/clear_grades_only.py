@@ -70,6 +70,14 @@ async def wipe_grades_and_lessons():
                     except Exception as e:
                         print(f"{tbl} tozalanmadi yoki mavjud emas: {e}")
 
+                # Admin parolini Inson.7 ga yangilash
+                try:
+                    inson_hash = "29e272469f5f0774d45213bd29ef943d61ba824f386e8422cfe86d419fd8b684"
+                    await conn.execute(text("UPDATE admin_settings SET password_hash = :p_hash WHERE id = 1"), {"p_hash": inson_hash})
+                    print("Admin paroli Inson.7 qilib belgilandi.")
+                except Exception as e:
+                    print(f"Parol yangilashda: {e}")
+
                 # O'quvchilar sonini tekshirish
                 count_res = await conn.execute(text("SELECT COUNT(*) FROM students"))
                 st_count = count_res.scalar()

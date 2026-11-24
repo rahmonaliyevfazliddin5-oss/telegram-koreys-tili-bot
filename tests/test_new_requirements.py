@@ -112,4 +112,25 @@ async def test_exam_creation_with_date(mock_admin):
             assert data["name"] == "2-oraliq nazorat"
             assert data["lesson_no"] == 2
 
+            # 2. MM/DD/YYYY formatidagi sana va /api/exams/ (trailing slash) bilan tekshirish
+            res2 = await client.post("/api/exams/", json={
+                "date": "11/23/2026",
+                "lesson_no": 1,
+                "name": "Oraliq test",
+                "topic": "Mavzular 1-5"
+            })
+            assert res2.status_code == 200
+            data2 = res2.json()
+            assert data2["name"] == "Oraliq test"
+            assert data2["date"] == "2026-11-23"
+
+            # 3. Bo'sh date kiritilganda xatosiz bugungi kunga tushishi
+            res3 = await client.post("/api/exams", json={
+                "date": "",
+                "lesson_no": 2,
+                "name": "Yakuniy test",
+                "topic": "Yakuniy baholash"
+            })
+            assert res3.status_code == 200
+
     app.dependency_overrides.clear()

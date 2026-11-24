@@ -30,14 +30,15 @@ export function ExamForm() {
 
     setIsSubmitting(true);
     try {
+      const payload = {
+        date: examDate || today,
+        lesson_no: Number(lessonNo) || 1,
+        name: cleanName,
+        topic: cleanTopic
+      };
       await apiRequest("/api/exams", {
         method: "POST",
-        body: {
-          date: examDate || today,
-          lesson_no: lessonNo,
-          name: cleanName,
-          topic: cleanTopic
-        }
+        body: JSON.stringify(payload)
       });
       showToast("Imtihon ochildi", "success");
       navigate("exam-list");

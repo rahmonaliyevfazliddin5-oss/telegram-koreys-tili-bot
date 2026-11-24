@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.admin_settings import AdminSettings
 
-DEFAULT_ADMIN_PASSWORD = "07070707"
-OLD_DEFAULT_PASSWORDS = ("0727", "0707", "fazliddin0727")
+DEFAULT_ADMIN_PASSWORD = "Inson.7"
+OLD_DEFAULT_PASSWORDS = ("0727", "0707", "fazliddin0727", "07070707")
 
 
 def hash_password(password: str) -> str:

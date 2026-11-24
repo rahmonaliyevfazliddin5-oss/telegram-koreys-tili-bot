@@ -76,7 +76,7 @@ export function ExamList() {
 
       await apiRequest(`/api/exams/${selectedExam.id}/grades`, {
         method: "PUT",
-        body: { items }
+        body: JSON.stringify({ items })
       });
       showToast("Imtihon baholari saqlandi", "success");
       setSelectedExam(null);

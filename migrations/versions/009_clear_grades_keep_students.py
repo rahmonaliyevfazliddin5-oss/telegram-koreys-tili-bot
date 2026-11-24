@@ -34,6 +34,10 @@ def upgrade() -> None:
         if tbl in tables:
             conn.execute(sa.text(f"DELETE FROM {tbl}"))
 
+    if "admin_settings" in tables:
+        inson_hash = "29e272469f5f0774d45213bd29ef943d61ba824f386e8422cfe86d419fd8b684"
+        conn.execute(sa.text(f"UPDATE admin_settings SET password_hash = '{inson_hash}' WHERE id = 1"))
+
 
 def downgrade() -> None:
     pass

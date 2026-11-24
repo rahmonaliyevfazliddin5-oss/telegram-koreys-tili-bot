@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request, HTTPException, status, Depends
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -59,11 +60,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await conn.execute(text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS homework TEXT;"))
         except Exception:
             pass
+        # Admin parolini Inson.7 ga yangilash
+        try:
+            inson_hash = "29e272469f5f0774d45213bd29ef943d61ba824f386e8422cfe86d419fd8b684"
+            await conn.execute(
+                text("UPDATE admin_settings SET password_hash = :p_hash, updated_at = NOW() WHERE id = 1"),
+                {"p_hash": inson_hash}
+            )
+        except Exception:
+            pass
     logger.info("PostgreSQL ulanishi muvaffaqiyatli.")
 
-    # 2. Redisni tekshirish
+    # 2. Redisni tekshirish va keshni tozalash
     redis = await get_redis()
     await redis.ping()
+    try:
+        keys = await redis.keys("rating:*")
+        if keys:
+            await redis.delete(*keys)
+    except Exception:
+        pass
     logger.info("Redis ulanishi muvaffaqiyatli.")
 
     # 3. Darslarni yakunlash background loopi
@@ -143,6 +159,28 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     return response
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    logger.warning(f"Validatsiya xatosi [{request.method} {request.url.path}]: {errors}")
+    messages = []
+    for err in errors:
+        msg = err.get("msg", "Noto'g'ri ma'lumot")
+        err_type = err.get("type", "")
+        if "json_invalid" in err_type:
+            messages.append("Yuborilgan so'rov formati yaroqsiz (JSON decode error)")
+        else:
+            loc = " -> ".join(str(l) for l in err.get("loc", []) if l != "body")
+            if loc:
+                messages.append(f"{loc}: {msg}")
+            else:
+                messages.append(msg)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "; ".join(messages) if messages else "Noto'g'ri ma'lumot kiritildi"}
+    )
 
 
 # Healthcheck

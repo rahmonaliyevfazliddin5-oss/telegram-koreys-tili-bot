@@ -23,6 +23,7 @@ router = APIRouter()
 
 
 @router.post("", response_model=ExamResponse)
+@router.post("/", response_model=ExamResponse, include_in_schema=False)
 async def create_exam(
     payload: ExamCreateRequest,
     admin: Dict[str, Any] = Depends(get_current_admin),
@@ -93,6 +94,7 @@ async def update_exam(
 
 
 @router.get("", response_model=List[ExamResponse])
+@router.get("/", response_model=List[ExamResponse], include_in_schema=False)
 async def get_exams(
     date_str: Optional[str] = Query(None, alias="date"),
     admin: Dict[str, Any] = Depends(get_current_admin),

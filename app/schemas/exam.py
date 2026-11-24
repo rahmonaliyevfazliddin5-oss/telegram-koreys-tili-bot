@@ -1,13 +1,37 @@
 from datetime import date as dt_date, datetime
-from typing import Optional, List
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from typing import Optional, List, Union
+from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
 
 
 class ExamCreateRequest(BaseModel):
-    date: Optional[dt_date] = None
+    date: Optional[Union[dt_date, str]] = None
     lesson_no: int = Field(..., ge=1, le=2)
     name: str = Field(..., min_length=2, max_length=100)
     topic: str = Field(..., min_length=3, max_length=300)
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def parse_exam_date(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, dt_date):
+            return v
+        if isinstance(v, str):
+            clean_v = v.strip()
+            if not clean_v:
+                return None
+            try:
+                return dt_date.fromisoformat(clean_v)
+            except Exception:
+                # MM/DD/YYYY formatini ham tekshirib ko'rish
+                try:
+                    parts = clean_v.split("/")
+                    if len(parts) == 3:
+                        m, d, y = int(parts[0]), int(parts[1]), int(parts[2])
+                        return dt_date(y, m, d)
+                except Exception:
+                    pass
+        return v
 
 
 class ExamUpdateRequest(BaseModel):

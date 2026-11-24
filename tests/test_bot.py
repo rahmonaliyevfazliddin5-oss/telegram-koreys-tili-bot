@@ -182,10 +182,10 @@ async def test_admin_start_prompt_code():
 
 
 @pytest.mark.asyncio
-async def test_admin_check_code_success_default_07070707():
+async def test_admin_check_code_success_default_inson7():
     message = AsyncMock()
     message.from_user.id = 55555
-    message.text = "07070707"
+    message.text = "Inson.7"
     state = AsyncMock()
 
     with patch("app.bot.handlers.admin.redis_client.ttl", new_callable=AsyncMock) as mock_ttl, \
