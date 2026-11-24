@@ -94,3 +94,25 @@ def get_rating_pagination_keyboard(current_page: int, total_pages: int) -> Inlin
         return InlineKeyboardMarkup(inline_keyboard=[])
 
     return InlineKeyboardMarkup(inline_keyboard=[buttons])
+
+
+def get_attendance_lessons_keyboard(lang: str = "uz") -> InlineKeyboardMarkup:
+    t1 = "1-dars tafsilotlari" if lang == "uz" else ("Lesson 1 details" if lang == "en" else "Детали 1-урока")
+    t2 = "2-dars tafsilotlari" if lang == "uz" else ("Lesson 2 details" if lang == "en" else "Детали 2-урока")
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=t1, callback_data="att_detail:1"),
+                InlineKeyboardButton(text=t2, callback_data="att_detail:2")
+            ]
+        ]
+    )
+
+
+def get_attendance_back_keyboard(lang: str = "uz") -> InlineKeyboardMarkup:
+    t = "Orqaga" if lang == "uz" else ("Back" if lang == "en" else "Назад")
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t, callback_data="att_back")]
+        ]
+    )

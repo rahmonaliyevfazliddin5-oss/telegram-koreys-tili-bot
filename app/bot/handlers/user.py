@@ -12,6 +12,7 @@ from app.models.student import Student
 from app.models.attendance import AttendanceMark, AttendanceSession, Absence
 from app.models.grade import Grade
 from app.models.lesson import Lesson
+from app.models.lesson_absence import LessonAbsence
 from app.models.source import Source
 from app.i18n.texts import get_text
 from app.services.time_service import get_tashkent_now, is_weekend
@@ -24,7 +25,9 @@ from app.bot.keyboards.user_kb import (
     get_main_menu_keyboard,
     get_students_pagination_keyboard,
     get_rating_pagination_keyboard,
-    get_portal_webapp_keyboard
+    get_portal_webapp_keyboard,
+    get_attendance_lessons_keyboard,
+    get_attendance_back_keyboard
 )
 from app.services.rating_service import calculate_and_cache_rating
 from app.services.cache_service import get_cached_sources, set_cached_sources
@@ -292,14 +295,7 @@ async def process_students_page(callback: CallbackQuery, lang: Optional[str] = N
     await callback.answer()
 
 
-@router.message(F.text.in_([
-    get_text("attendance_btn", "uz"),
-    get_text("attendance_btn", "en"),
-    get_text("attendance_btn", "ru")
-]))
-@router.message(Command("attendance"))
-async def show_attendance(message: Message, lang: Optional[str] = None):
-    user_lang = lang or "uz"
+async def build_attendance_overview_text(user_lang: str) -> str:
     now = get_tashkent_now()
     today = now.date()
     today_str = today.strftime("%Y-%m-%d")
@@ -387,7 +383,176 @@ async def show_attendance(message: Message, lang: Optional[str] = None):
 
         lines.append("")
 
-    await message.answer("\n".join(lines).strip())
+    return "\n".join(lines).strip()
+
+
+async def build_lesson_detail_text(lesson_no: int, user_lang: str) -> str:
+    now = get_tashkent_now()
+    today = now.date()
+
+    async with async_session_maker() as session:
+        lesson_stmt = select(Lesson).where(Lesson.date == today, Lesson.lesson_no == lesson_no)
+        lesson_obj = (await session.execute(lesson_stmt)).scalars().first()
+
+        if not lesson_obj:
+            latest_stmt = (
+                select(Lesson)
+                .where(Lesson.lesson_no == lesson_no)
+                .order_by(Lesson.date.desc())
+                .limit(1)
+            )
+            lesson_obj = (await session.execute(latest_stmt)).scalars().first()
+
+        if not lesson_obj:
+            return f"{lesson_no}-dars bo'yicha ma'lumot mavjud emas."
+
+        l_date = lesson_obj.date
+        l_date_str = l_date.strftime("%Y-%m-%d")
+
+        std_stmt = select(Student).order_by(
+            func.coalesce(func.nullif(Student.last_name, ""), Student.first_name).asc(),
+            Student.first_name.asc()
+        )
+        all_students = (await session.execute(std_stmt)).scalars().all()
+
+        marks_stmt = select(AttendanceMark).where(
+            AttendanceMark.date == l_date,
+            AttendanceMark.lesson_no == lesson_no
+        )
+        marks = (await session.execute(marks_stmt)).scalars().all()
+        marks_by_std = {m.student_id: m for m in marks}
+
+        grades_stmt = select(Grade).where(
+            Grade.date == l_date,
+            Grade.lesson_no == lesson_no
+        )
+        grades = (await session.execute(grades_stmt)).scalars().all()
+        grades_by_std = {g.student_id: g for g in grades if g.value is not None}
+
+        abs_stmt = select(LessonAbsence).where(LessonAbsence.lesson_id == lesson_obj.id)
+        lesson_absences = (await session.execute(abs_stmt)).scalars().all()
+        lesson_absence_std_ids = {a.student_id for a in lesson_absences}
+
+        attended_list = []
+        attended_ids = set()
+        for s in all_students:
+            m = marks_by_std.get(s.id)
+            g = grades_by_std.get(s.id)
+            full_name = f"{s.first_name} {s.last_name or ''}".strip()
+            if m and m.status == "late":
+                attended_ids.add(s.id)
+                attended_list.append(f"- {full_name} ({format_bot_late_display(m.late_minutes, user_lang)})")
+            elif (m and m.status == "present") or g:
+                attended_ids.add(s.id)
+                attended_list.append(f"- {full_name} (Qatnashdi)")
+
+        graded_list = []
+        for s in all_students:
+            g = grades_by_std.get(s.id)
+            if g and g.value is not None:
+                full_name = f"{s.first_name} {s.last_name or ''}".strip()
+                mod_str = f" ({g.modifier})" if g.modifier else ""
+                graded_list.append(f"- {full_name}: {g.value}{mod_str}")
+
+        absent_list = []
+        for s in all_students:
+            if s.id in attended_ids:
+                continue
+            is_abs = False
+            if s.id in lesson_absence_std_ids:
+                is_abs = True
+            elif marks_by_std.get(s.id) and marks_by_std[s.id].status == "absent":
+                is_abs = True
+            elif s.created_at <= lesson_obj.started_at:
+                is_abs = True
+
+            if is_abs:
+                full_name = f"{s.first_name} {s.last_name or ''}".strip()
+                absent_list.append(f"- {full_name}")
+
+    status_str = "Yakunlangan" if is_lesson_completed(l_date, lesson_no, now) else "Jarayonda"
+    topic_str = lesson_obj.topic or "Koreys tili"
+
+    lines = [
+        f"{lesson_no}-DARS TAFSILOTLARI",
+        f"Sana: {l_date_str}",
+        f"Mavzu: {topic_str}",
+        f"Holat: {status_str}",
+        "",
+        f"Umumiy qatnashganlar: {len(attended_list)} nafar",
+        f"Baholanganlar: {len(graded_list)} nafar",
+        f"Dars qoldirganlar: {len(absent_list)} nafar",
+        "",
+        "Qatnashgan o'quvchilar:"
+    ]
+    if attended_list:
+        lines.extend(attended_list[:30])
+        if len(attended_list) > 30:
+            lines.append(f"... va yana {len(attended_list) - 30} nafar")
+    else:
+        lines.append("- (Qatnashganlar yo'q)")
+
+    lines.append("")
+    lines.append("Baholangan o'quvchilar:")
+    if graded_list:
+        lines.extend(graded_list[:30])
+        if len(graded_list) > 30:
+            lines.append(f"... va yana {len(graded_list) - 30} nafar")
+    else:
+        lines.append("- (Baholanganlar yo'q)")
+
+    lines.append("")
+    lines.append("Dars qoldirgan o'quvchilar:")
+    if absent_list:
+        lines.extend(absent_list[:30])
+        if len(absent_list) > 30:
+            lines.append(f"... va yana {len(absent_list) - 30} nafar")
+    else:
+        lines.append("- (Dars qoldirganlar yo'q)")
+
+    return "\n".join(lines).strip()
+
+
+@router.message(F.text.in_([
+    get_text("attendance_btn", "uz"),
+    get_text("attendance_btn", "en"),
+    get_text("attendance_btn", "ru")
+]))
+@router.message(Command("attendance"))
+async def show_attendance(message: Message, lang: Optional[str] = None):
+    user_lang = lang or "uz"
+    text = await build_attendance_overview_text(user_lang)
+    keyboard = get_attendance_lessons_keyboard(user_lang)
+    await message.answer(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("att_detail:"))
+async def process_attendance_detail(callback: CallbackQuery, lang: Optional[str] = None):
+    user_lang = lang or "uz"
+    try:
+        lesson_no = int(callback.data.split(":")[1])
+    except (IndexError, ValueError):
+        lesson_no = 1
+
+    text = await build_lesson_detail_text(lesson_no, user_lang)
+    keyboard = get_attendance_back_keyboard(user_lang)
+    try:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    except Exception:
+        pass
+    await callback.answer()
+
+
+@router.callback_query(F.data == "att_back")
+async def process_attendance_back(callback: CallbackQuery, lang: Optional[str] = None):
+    user_lang = lang or "uz"
+    text = await build_attendance_overview_text(user_lang)
+    keyboard = get_attendance_lessons_keyboard(user_lang)
+    try:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    except Exception:
+        pass
+    await callback.answer()
 
 
 @router.message(F.text.in_([

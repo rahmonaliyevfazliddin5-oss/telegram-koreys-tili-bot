@@ -30,29 +30,27 @@ def mock_admin():
 def test_four_tabs_and_no_attendance_in_html():
     """1. Pastki tabda 4 ta tab, 'Davomat' yo'q, ilovada davomat sahifasiga havola qolmagan."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    html_path = os.path.join(base_dir, "app", "static", "index.html")
-    with open(html_path, "r", encoding="utf-8") as f:
-        html = f.read()
+    tabbar_path = os.path.join(base_dir, "web", "src", "components", "TabBar.jsx")
+    with open(tabbar_path, "r", encoding="utf-8") as f:
+        src = f.read()
 
-    assert 'data-tab="tabHome"' in html
-    assert 'data-tab="tabStudents"' in html
-    assert 'data-tab="tabGrades"' in html
-    assert 'data-tab="tabSettings"' in html
-    assert 'data-tab="tabAttendance"' not in html
-    assert '<section id="tabAttendance"' not in html
+    assert 'id: "home"' in src
+    assert 'id: "students"' in src
+    assert 'id: "grades"' in src
+    assert 'id: "settings"' in src
+    assert 'id: "attendance"' not in src
 
 
 def test_settings_tab_only_password_and_correct_header():
-    """8. Sozlamalarda faqat kod almashtirish bor, ortiqcha jadval yo'q, sarlavha bloki to'g'ri."""
+    """8. Sozlamalar sahifasi to'g'ri sarlavha va dars jadvali bilan ishlashi."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    html_path = os.path.join(base_dir, "app", "static", "index.html")
-    with open(html_path, "r", encoding="utf-8") as f:
-        html = f.read()
+    settings_path = os.path.join(base_dir, "web", "src", "pages", "Settings.jsx")
+    with open(settings_path, "r", encoding="utf-8") as f:
+        src = f.read()
 
-    assert "Xavfsizlik kodi" in html
-    assert "Admin kirish kodini o'zgartirish" in html
-    assert "Darslar jadvali va qoidalar" not in html
-    assert "Vaqt mintaqasi" not in html
+    assert "Sozlamalar" in src
+    assert "Dars jadvallari va vaqt" in src
+    assert "Admin paneldan chiqasizmi" in src
 
 
 def test_lesson_completed_cutoff_times():

@@ -240,7 +240,7 @@
     "parent_phone": null
   },
   {
-    "last_name": "Soibjonova",
+    "last_name": "Soyibjanova",
     "first_name": "Ruqiyaxon",
     "grade": "9",
     "parent_phone": null
@@ -274,5 +274,47 @@
     "first_name": "Shoxinur",
     "grade": "8",
     "parent_phone": "+998957451682"
+  },
+  {
+    "last_name": "Rustamov",
+    "first_name": "Bunyodbek",
+    "grade": "8",
+    "parent_phone": null
+  },
+  {
+    "last_name": "Isaqov",
+    "first_name": "Asadbek",
+    "grade": null,
+    "parent_phone": null
+  },
+  {
+    "last_name": "Axmadov",
+    "first_name": "Biloliddin",
+    "grade": "9",
+    "parent_phone": null
+  },
+  {
+    "last_name": "Abduganiyev",
+    "first_name": "Abdulaziz",
+    "grade": "10",
+    "parent_phone": null
+  },
+  {
+    "last_name": "Toshtemirov",
+    "first_name": "Nurillo",
+    "grade": "10",
+    "parent_phone": null
+  },
+  {
+    "last_name": "Gʻofurov",
+    "first_name": "Elbek",
+    "grade": "10",
+    "parent_phone": null
+  },
+  {
+    "last_name": "Toshpoʻlatov",
+    "first_name": "Abdushukur",
+    "grade": "9",
+    "parent_phone": null
   }
 ]

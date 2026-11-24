@@ -115,7 +115,7 @@ def test_students_seed_json_integrity():
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    assert len(data) == 46
+    assert len(data) == 53
     for item in data:
         assert "last_name" in item
         assert "first_name" in item
@@ -172,3 +172,92 @@ def test_zero_emojis_in_app():
                             if is_emoji(char):
                                 emojis_found.append((path, line_idx, char))
     assert len(emojis_found) == 0, f"Emojis found: {emojis_found}"
+
+
+def test_added_eight_students_present_in_seed():
+    seed_path = os.path.join(os.path.dirname(__file__), "..", "data", "students_seed.json")
+    with open(seed_path, "r", encoding="utf-8") as f:
+        students = json.load(f)
+
+    names = [f"{s['first_name']} {s.get('last_name') or ''}".strip() for s in students]
+    full_names = {f"{s.get('last_name') or ''} {s['first_name']}".strip() for s in students}
+    all_name_variants = set(names) | full_names
+
+    expected_students = [
+        "Rustamov Bunyodbek",
+        "Isaqov Asadbek",
+        "Soyibjanova Ruqiyaxon",
+        "Axmadov Biloliddin",
+        "Abduganiyev Abdulaziz",
+        "Toshtemirov Nurillo",
+        "Gʻofurov Elbek",
+        "Toshpoʻlatov Abdushukur"
+    ]
+
+    for expected in expected_students:
+        assert any(expected in variant for variant in all_name_variants), f"{expected} not found in seed"
+
+    # Confirm Soibjonova is replaced by Soyibjanova
+    assert not any("Soibjonova" in n for n in names), "Old Soibjonova should be renamed to Soyibjanova"
+
+
+def test_attendance_keyboards():
+    from app.bot.keyboards.user_kb import get_attendance_lessons_keyboard, get_attendance_back_keyboard
+    kb = get_attendance_lessons_keyboard("uz")
+    assert len(kb.inline_keyboard) == 1
+    assert len(kb.inline_keyboard[0]) == 2
+    assert kb.inline_keyboard[0][0].callback_data == "att_detail:1"
+    assert kb.inline_keyboard[0][1].callback_data == "att_detail:2"
+
+    back_kb = get_attendance_back_keyboard("uz")
+    assert len(back_kb.inline_keyboard) == 1
+    assert back_kb.inline_keyboard[0][0].callback_data == "att_back"
+
+
+def test_teacher_lesson_detail_schema():
+    from app.schemas.teacher import (
+        TeacherLessonItem,
+        TeacherStudentAttended,
+        TeacherStudentGraded,
+        TeacherStudentAbsent,
+        TeacherLessonDetailResponse
+    )
+    lesson = TeacherLessonItem(
+        lesson_no=1,
+        time="07:00",
+        display="1-dars 07:00 — Mavzu 1",
+        topic="Mavzu 1",
+        attended_count=2,
+        graded_count=1,
+        absent_count=1,
+        attended_students=[
+            TeacherStudentAttended(id=1, name="Ali Valiyev", status="present", late_minutes=None),
+            TeacherStudentAttended(id=2, name="Gani Salimov", status="late", late_minutes=10)
+        ],
+        graded_students=[
+            TeacherStudentGraded(id=1, name="Ali Valiyev", value=5, modifier="+")
+        ],
+        absent_students=[
+            TeacherStudentAbsent(id=3, name="Hasan Boltayev")
+        ]
+    )
+    assert lesson.attended_count == 2
+    assert len(lesson.attended_students) == 2
+    assert len(lesson.graded_students) == 1
+    assert len(lesson.absent_students) == 1
+
+    detail_resp = TeacherLessonDetailResponse(
+        date="2026-11-24",
+        date_formatted="24-noyabr, Seshanba",
+        lesson_no=1,
+        time="07:00",
+        topic="Mavzu 1",
+        attended_count=2,
+        graded_count=1,
+        absent_count=1,
+        attended_students=lesson.attended_students,
+        graded_students=lesson.graded_students,
+        absent_students=lesson.absent_students
+    )
+    assert detail_resp.lesson_no == 1
+

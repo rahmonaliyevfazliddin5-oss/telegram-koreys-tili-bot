@@ -7,6 +7,7 @@ from sqlalchemy import select, func, and_
 
 from app.database import get_db
 from app.api.deps import get_current_admin
+from app.models.student import Student
 from app.models.lesson import Lesson
 from app.models.exam import Exam, ExamGrade
 from app.models.grade import Grade
@@ -16,7 +17,11 @@ from app.schemas.teacher import (
     TeacherProfileResponse,
     TeacherDayCard,
     TeacherLessonItem,
-    TeacherExamCard
+    TeacherExamCard,
+    TeacherStudentAttended,
+    TeacherStudentGraded,
+    TeacherStudentAbsent,
+    TeacherLessonDetailResponse
 )
 from app.services.time_service import get_tashkent_now
 
@@ -135,22 +140,45 @@ async def get_teacher_profile(
         for eg in eg_res.scalars().all():
             exam_grades_map.setdefault(eg.exam_id, []).append(eg.value)
 
-    # Darslar bo'yicha hisoblar
+    # Barcha o'quvchilarni olish
+    students_stmt = select(Student)
+    students_res = await db.execute(students_stmt)
+    students_map = {s.id: s for s in students_res.scalars().all()}
+
+    # Shu oydagi lesson_absences yozuvlarini olish
+    lesson_ids = [l.id for l in month_lessons]
+    absences_map = {}
+    if lesson_ids:
+        abs_stmt = select(LessonAbsence).where(LessonAbsence.lesson_id.in_(lesson_ids))
+        abs_res = await db.execute(abs_stmt)
+        for ab in abs_res.scalars().all():
+            absences_map.setdefault(ab.lesson_id, set()).add(ab.student_id)
+
+    # Darslar bo'yicha hisoblar va talabalar ro'yxatlari
     lesson_stats = {}
     for g in month_grades:
         key = (g.date, g.lesson_no)
-        st = lesson_stats.setdefault(key, {"graded": set(), "attended": set(), "absent": set()})
+        st = lesson_stats.setdefault(key, {
+            "graded_map": {},
+            "attended_map": {},
+            "absent_ids": set()
+        })
         if g.value is not None:
-            st["graded"].add(g.student_id)
-            st["attended"].add(g.student_id)
+            st["graded_map"][g.student_id] = g
+            if g.student_id not in st["attended_map"]:
+                st["attended_map"][g.student_id] = {"status": "present", "late_minutes": None}
 
     for a in month_att:
         key = (a.date, a.lesson_no)
-        st = lesson_stats.setdefault(key, {"graded": set(), "attended": set(), "absent": set()})
+        st = lesson_stats.setdefault(key, {
+            "graded_map": {},
+            "attended_map": {},
+            "absent_ids": set()
+        })
         if a.status in ("present", "late"):
-            st["attended"].add(a.student_id)
+            st["attended_map"][a.student_id] = {"status": a.status, "late_minutes": a.late_minutes}
         elif a.status == "absent":
-            st["absent"].add(a.student_id)
+            st["absent_ids"].add(a.student_id)
 
     # Ish kunlari (dushanba-juma) ro'yxatini shakllantirish
     workdays = []
@@ -168,10 +196,67 @@ async def get_teacher_profile(
             if (cur_date, l_num) in lessons_dict:
                 l_obj = lessons_dict[(cur_date, l_num)]
                 t = l_obj.topic
-                c_stats = lesson_stats.get((cur_date, l_num), {"graded": set(), "attended": set(), "absent": set()})
-                att_c = len(c_stats["attended"])
-                grd_c = len(c_stats["graded"])
-                abs_c = len(c_stats["absent"])
+                c_stats = lesson_stats.get((cur_date, l_num), {
+                    "graded_map": {},
+                    "attended_map": {},
+                    "absent_ids": set()
+                })
+
+                # Shu darsdagi lesson_absences ni ham qo'shish
+                db_absent_ids = set(c_stats["absent_ids"]) | absences_map.get(l_obj.id, set())
+
+                # 1. Qatnashganlar ro'yxati
+                attended_students_list = []
+                for s_id, att_info in c_stats["attended_map"].items():
+                    s = students_map.get(s_id)
+                    if s:
+                        name = f"{s.last_name} {s.first_name}".strip() if s.last_name else s.first_name
+                        attended_students_list.append(
+                            TeacherStudentAttended(
+                                id=s.id,
+                                name=name,
+                                status=att_info["status"],
+                                late_minutes=att_info["late_minutes"]
+                            )
+                        )
+                attended_students_list.sort(key=lambda x: x.name.lower())
+
+                # 2. Baholanganlar ro'yxati
+                graded_students_list = []
+                for s_id, g in c_stats["graded_map"].items():
+                    s = students_map.get(s_id)
+                    if s:
+                        name = f"{s.last_name} {s.first_name}".strip() if s.last_name else s.first_name
+                        graded_students_list.append(
+                            TeacherStudentGraded(
+                                id=s.id,
+                                name=name,
+                                value=g.value,
+                                modifier=g.modifier
+                            )
+                        )
+                graded_students_list.sort(key=lambda x: x.name.lower())
+
+                # 3. Dars qoldirganlar ro'yxati
+                absent_students_list = []
+                for s_id in db_absent_ids:
+                    # Qatnashganlar orasida yo'q bo'lsa
+                    if s_id not in c_stats["attended_map"]:
+                        s = students_map.get(s_id)
+                        if s:
+                            name = f"{s.last_name} {s.first_name}".strip() if s.last_name else s.first_name
+                            absent_students_list.append(
+                                TeacherStudentAbsent(
+                                    id=s.id,
+                                    name=name
+                                )
+                            )
+                absent_students_list.sort(key=lambda x: x.name.lower())
+
+                att_c = len(attended_students_list)
+                grd_c = len(graded_students_list)
+                abs_c = len(absent_students_list)
+
                 day_lessons.append(
                     TeacherLessonItem(
                         lesson_no=l_num,
@@ -181,7 +266,10 @@ async def get_teacher_profile(
                         attended_count=att_c,
                         graded_count=grd_c,
                         absent_count=abs_c,
-                        homework=l_obj.homework
+                        homework=l_obj.homework,
+                        attended_students=attended_students_list,
+                        graded_students=graded_students_list,
+                        absent_students=absent_students_list
                     )
                 )
 
@@ -229,4 +317,123 @@ async def get_teacher_profile(
         month_name=month_title,
         workdays=workdays,
         exams=exam_cards
+    )
+
+
+@router.get("/lesson-details", response_model=TeacherLessonDetailResponse)
+async def get_teacher_lesson_details(
+    date_str: str = Query(..., alias="date", description="Sana (YYYY-MM-DD)"),
+    lesson_no: int = Query(..., ge=1, le=2, description="Dars raqami (1 yoki 2)"),
+    admin: Dict[str, Any] = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        cur_date = date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Noto'g'ri sana formati")
+
+    stmt = select(Lesson).where(Lesson.date == cur_date, Lesson.lesson_no == lesson_no)
+    res = await db.execute(stmt)
+    l_obj = res.scalar_one_or_none()
+    if not l_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dars topilmadi")
+
+    # Barcha o'quvchilar
+    students_stmt = select(Student)
+    students_res = await db.execute(students_stmt)
+    students_map = {s.id: s for s in students_res.scalars().all()}
+
+    # Baholar
+    grades_stmt = select(Grade).where(Grade.date == cur_date, Grade.lesson_no == lesson_no)
+    grades_res = await db.execute(grades_stmt)
+    grades = grades_res.scalars().all()
+    graded_map = {g.student_id: g for g in grades if g.value is not None}
+
+    # Davomat
+    att_stmt = select(AttendanceMark).where(AttendanceMark.date == cur_date, AttendanceMark.lesson_no == lesson_no)
+    att_res = await db.execute(att_stmt)
+    att_marks = att_res.scalars().all()
+
+    attended_map = {}
+    absent_ids = set()
+    for a in att_marks:
+        if a.status in ("present", "late"):
+            attended_map[a.student_id] = {"status": a.status, "late_minutes": a.late_minutes}
+        elif a.status == "absent":
+            absent_ids.add(a.student_id)
+
+    for s_id in graded_map:
+        if s_id not in attended_map:
+            attended_map[s_id] = {"status": "present", "late_minutes": None}
+
+    # Lesson absences
+    abs_stmt = select(LessonAbsence.student_id).where(LessonAbsence.lesson_id == l_obj.id)
+    abs_res = await db.execute(abs_stmt)
+    for s_id in abs_res.scalars().all():
+        absent_ids.add(s_id)
+
+    # 1. Qatnashganlar
+    attended_list = []
+    for s_id, att_info in attended_map.items():
+        s = students_map.get(s_id)
+        if s:
+            name = f"{s.last_name} {s.first_name}".strip() if s.last_name else s.first_name
+            attended_list.append(
+                TeacherStudentAttended(
+                    id=s.id,
+                    name=name,
+                    status=att_info["status"],
+                    late_minutes=att_info["late_minutes"]
+                )
+            )
+    attended_list.sort(key=lambda x: x.name.lower())
+
+    # 2. Baholanganlar
+    graded_list = []
+    for s_id, g in graded_map.items():
+        s = students_map.get(s_id)
+        if s:
+            name = f"{s.last_name} {s.first_name}".strip() if s.last_name else s.first_name
+            graded_list.append(
+                TeacherStudentGraded(
+                    id=s.id,
+                    name=name,
+                    value=g.value,
+                    modifier=g.modifier
+                )
+            )
+    graded_list.sort(key=lambda x: x.name.lower())
+
+    # 3. Dars qoldirganlar
+    absent_list = []
+    for s_id in absent_ids:
+        if s_id not in attended_map:
+            s = students_map.get(s_id)
+            if s:
+                name = f"{s.last_name} {s.first_name}".strip() if s.last_name else s.first_name
+                absent_list.append(
+                    TeacherStudentAbsent(
+                        id=s.id,
+                        name=name
+                    )
+                )
+    absent_list.sort(key=lambda x: x.name.lower())
+
+    l_time = "07:00" if lesson_no == 1 else "15:45"
+    w_name = UZ_WEEKDAYS.get(cur_date.weekday(), "")
+    d_fmt = f"{cur_date.day}-{UZ_MONTHS[cur_date.month]}, {w_name}"
+
+    return TeacherLessonDetailResponse(
+        date=cur_date.isoformat(),
+        date_formatted=d_fmt,
+        lesson_no=lesson_no,
+        time=l_time,
+        topic=l_obj.topic,
+        homework=l_obj.homework,
+        attended_count=len(attended_list),
+        graded_count=len(graded_list),
+        absent_count=len(absent_list),
+        attended_students=attended_list,
+        graded_students=graded_list,
+        absent_students=absent_list
     )

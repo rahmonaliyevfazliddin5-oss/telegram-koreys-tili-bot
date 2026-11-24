@@ -34,6 +34,9 @@ async def sync_students_seed():
             if (s.last_name or "").strip().lower() == "raxmatullayev" and s.first_name.strip().lower() == "fazliddin":
                 s.last_name = "Rahmonaliyev"
                 print("Mavjud Raxmatullayev Fazliddin -> Rahmonaliyev Fazliddin ga yangilandi.")
+            if (s.last_name or "").strip().lower() == "soibjonova" and s.first_name.strip().lower() == "ruqiyaxon":
+                s.last_name = "Soyibjanova"
+                print("Mavjud Soibjonova Ruqiyaxon -> Soyibjanova Ruqiyaxon ga yangilandi.")
 
         existing_map = {}
         for s in existing_students:

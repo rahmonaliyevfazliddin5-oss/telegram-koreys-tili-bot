@@ -76,6 +76,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             )
         except Exception:
             pass
+        # Yangi o'quvchilarni kiritish va Soibjonova -> Soyibjanova yangilash
+        try:
+            await conn.execute(
+                text("UPDATE students SET last_name = 'Soyibjanova' WHERE last_name = 'Soibjonova' AND first_name = 'Ruqiyaxon'")
+            )
+            new_st_list = [
+                ("Bunyodbek", "Rustamov", "8"),
+                ("Asadbek", "Isaqov", None),
+                ("Ruqiyaxon", "Soyibjanova", "9"),
+                ("Biloliddin", "Axmadov", "9"),
+                ("Abdulaziz", "Abduganiyev", "10"),
+                ("Nurillo", "Toshtemirov", "10"),
+                ("Elbek", "Gʻofurov", "10"),
+                ("Abdushukur", "Toshpoʻlatov", "9"),
+            ]
+            for fn, ln, gr in new_st_list:
+                await conn.execute(
+                    text(
+                        "INSERT INTO students (first_name, last_name, grade, parent_phone, lesson_slots, created_at) "
+                        "SELECT :fn, :ln, :gr, NULL, NULL, NOW() "
+                        "WHERE NOT EXISTS (SELECT 1 FROM students WHERE first_name = :fn AND last_name = :ln)"
+                    ),
+                    {"fn": fn, "ln": ln, "gr": gr}
+                )
+        except Exception:
+            pass
     logger.info("PostgreSQL ulanishi muvaffaqiyatli.")
 
     # 2. Redisni tekshirish va keshni tozalash

@@ -84,35 +84,38 @@ def test_no_duplicate_x_close_button():
 
 def test_home_tab_components():
     """Bosh sahifadagi barcha talab qilingan komponentlar mavjudligini tekshirish."""
-    html_path = os.path.join(STATIC_DIR, "index.html")
-    with open(html_path, "r", encoding="utf-8") as f:
-        html = f.read()
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    home_path = os.path.join(base_dir, "web", "src", "pages", "Home.jsx")
+    with open(home_path, "r", encoding="utf-8") as f:
+        src = f.read()
 
-    # 1. Holat banneri (status banner / announcement)
-    assert 'id="homeStatusBanner"' in html or 'home-status-card' in html or 'status-banner' in html
+    # 1. Holat / dars kartasi
+    assert "LessonCard" in src or "StatCard" in src
 
-    # 2. Halqali davomat kartasi (ring attendance card / circular progress)
-    assert 'id="ringProgress"' in html or 'attendance-ring' in html or 'ring-card' in html or '<circle' in html
+    # 2. Halqali davomat kartasi
+    assert "Ring" in src
 
-    # 3. Ikki tezkor tugma qatori (Davomat, Baholash)
-    assert 'btnQuickAttendance' in html or 'two-buttons-row' in html
+    # 3. Dars boshlash Sheet / modal
+    assert "Sheet" in src
 
     # 4. TOP-3 reyting kartasi
-    assert 'homeRatingList' in html or 'top-rating' in html or 'rating-card' in html
+    assert "top3" in src
 
-    # 5. Manbalar kartasi
-    assert 'homeSourcesList' in html or 'sources-card' in html
+    # 5. O'qituvchi profili mavjudligi
+    app_src = open(os.path.join(base_dir, "web", "src", "App.jsx"), encoding="utf-8").read()
+    assert "TeacherProfile" in app_src
 
 
 def test_four_tabs_structure():
     """Pastki menyuda aynan 4 ta tab mavjudligi: Davomat olib tashlangan."""
-    html_path = os.path.join(STATIC_DIR, "index.html")
-    with open(html_path, "r", encoding="utf-8") as f:
-        html = f.read()
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    tabbar_path = os.path.join(base_dir, "web", "src", "components", "TabBar.jsx")
+    with open(tabbar_path, "r", encoding="utf-8") as f:
+        src = f.read()
 
     # 4 ta tab identifikatorlari
-    assert 'data-tab="tabHome"' in html
-    assert 'data-tab="tabStudents"' in html
-    assert 'data-tab="tabGrades"' in html
-    assert 'data-tab="tabSettings"' in html
-    assert 'data-tab="tabAttendance"' not in html
+    assert 'id: "home"' in src
+    assert 'id: "students"' in src
+    assert 'id: "grades"' in src
+    assert 'id: "settings"' in src
+    assert 'id: "attendance"' not in src

@@ -41,11 +41,11 @@ async def test_seed_students_idempotency_and_rating():
             ]
             session.add_all(to_add)
 
-    # Verify 46 students inserted
+    # Verify students inserted
     async with async_session() as session:
         from sqlalchemy import select, func
         count_res = await session.execute(select(func.count(Student.id)))
-        assert count_res.scalar() == 46
+        assert count_res.scalar() == len(students_data)
 
     # 3. Second seed run (Idempotency check)
     added_second_run = 0
@@ -63,14 +63,14 @@ async def test_seed_students_idempotency_and_rating():
                     added_second_run += 1
 
     assert added_second_run == 0
-    assert skipped_second_run == 46
+    assert skipped_second_run == len(students_data)
 
-    # 4. Rating calculation check (All 46 have 0 score, no errors)
+    # 4. Rating calculation check (All have 0 score, no errors)
     async with async_session() as session:
         with patch("app.services.rating_service.get_cached_rating", return_value=None), \
              patch("app.services.rating_service.set_cached_rating", new_callable=AsyncMock):
             ratings = await calculate_and_cache_rating(session)
-            assert len(ratings) == 46
+            assert len(ratings) == len(students_data)
             # All have total_score == 0
             for r in ratings:
                 assert r["total_score"] == 0

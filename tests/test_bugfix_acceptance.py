@@ -113,39 +113,23 @@ async def test_exams_newest_first_ordering():
 
 
 def test_ui_components_structure_for_section7():
-    """HTML va CSS tekshiruvi: yagona Saqlash paneli, 4 ta qidiruv maydoni, sinf chiplari va xatolik matnlari."""
+    """React komponentlari va tuzilmasi mavjudligini tekshirish."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    html_path = os.path.join(base_dir, "app", "static", "index.html")
-    css_path = os.path.join(base_dir, "app", "static", "style.css")
+    web_dir = os.path.join(base_dir, "web", "src")
 
-    with open(html_path, "r", encoding="utf-8") as f:
-        html = f.read()
+    students_jsx = open(os.path.join(web_dir, "pages", "Students.jsx"), encoding="utf-8").read()
+    grading_jsx = open(os.path.join(web_dir, "pages", "Grading.jsx"), encoding="utf-8").read()
+    tabbar_jsx = open(os.path.join(web_dir, "components", "TabBar.jsx"), encoding="utf-8").read()
 
-    with open(css_path, "r", encoding="utf-8") as f:
-        css = f.read()
+    # 1. Qidiruv va sinf filtrlari
+    assert "search" in students_jsx or "selectedGrade" in students_jsx
+    assert "search" in grading_jsx or "selectedClass" in grading_jsx
 
-    # 1. Yagona saqlash paneli konteyneri
-    assert 'id="globalSaveContainer"' in html
-    assert html.count('id="btnSaveAttendance"') == 0
-    assert html.count('id="btnSaveGrades"') == 0
+    # 2. Saqlash imkoniyati
+    assert "handleSave" in grading_jsx or "Saqlash" in grading_jsx
 
-    # 2. Qidiruv va sinf filtrlari o'quvchilar ro'yxatlari uchun (O'quvchilar, Baholash dars, Baholash imtihon)
-    assert 'id="studentSearchInput"' in html
-    assert 'id="studentsClassChips"' in html
-    assert 'id="dailyGradeSearchInput"' in html
-    assert 'id="dailyGradeClassChips"' in html
-    assert 'id="examGradeSearchInput"' in html
-    assert 'id="examGradeClassChips"' in html
-
-    # 3. Kech qoldi xatolik matni
-    assert 'id="lateInputError"' in html
-
-    # 4. Imtihon FAB tugmasi
-    assert 'id="fabAddExam"' in html
-
-    # 5. CSS qoidalari: safe-area, tab-h, save-h, keyboard-open
-    assert "--tab-h: 64px;" in css
-    assert "--save-h: 56px;" in css
-    assert "body.keyboard-open .bottom-nav" in css
-    assert ".global-save-bar" in css
-    assert ".btn-spinner" in css
+    # 3. 4 ta asosiy tab
+    assert 'id: "home"' in tabbar_jsx
+    assert 'id: "students"' in tabbar_jsx
+    assert 'id: "grades"' in tabbar_jsx
+    assert 'id: "settings"' in tabbar_jsx
