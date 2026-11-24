@@ -43,14 +43,18 @@ def upgrade() -> None:
         ]
         now = datetime.now(timezone.utc)
         for fn, ln, gr in new_students:
-            conn.execute(
-                sa.text(
-                    "INSERT INTO students (first_name, last_name, grade, parent_phone, lesson_slots, created_at) "
-                    "SELECT :fn, :ln, :gr, NULL, NULL, :ca "
-                    "WHERE NOT EXISTS (SELECT 1 FROM students WHERE first_name = :fn AND last_name = :ln)"
-                ),
-                {"fn": fn, "ln": ln, "gr": gr, "ca": now}
-            )
+            exists = conn.execute(
+                sa.text("SELECT 1 FROM students WHERE first_name = :fn AND last_name = :ln"),
+                {"fn": fn, "ln": ln}
+            ).first()
+            if not exists:
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO students (first_name, last_name, grade, parent_phone, lesson_slots, created_at) "
+                        "VALUES (:fn, :ln, :gr, NULL, NULL, :ca)"
+                    ),
+                    {"fn": fn, "ln": ln, "gr": gr, "ca": now}
+                )
 
 
 def downgrade() -> None:
