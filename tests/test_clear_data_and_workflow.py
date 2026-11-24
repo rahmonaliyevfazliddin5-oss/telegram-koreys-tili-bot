@@ -43,3 +43,12 @@ def test_clear_grades_migration_and_script():
     assert "backup_before_wipe" in content_scr
     assert "wipe_grades_and_lessons" in content_scr
     assert "Inson.7" in content_scr
+
+
+def test_update_student_rahmonaliyev_migration():
+    mig_path = Path("migrations/versions/010_update_student_rahmonaliyev.py")
+    assert mig_path.exists()
+    content = mig_path.read_text(encoding="utf-8")
+    assert "Rahmonaliyev" in content
+    assert "Raxmatullayev" in content
+    assert "Fazliddin" in content

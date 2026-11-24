@@ -69,6 +69,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             )
         except Exception:
             pass
+        # O'quvchi familyasini Rahmonaliyev Fazliddin ga yangilash
+        try:
+            await conn.execute(
+                text("UPDATE students SET last_name = 'Rahmonaliyev' WHERE last_name = 'Raxmatullayev' AND first_name = 'Fazliddin'")
+            )
+        except Exception:
+            pass
     logger.info("PostgreSQL ulanishi muvaffaqiyatli.")
 
     # 2. Redisni tekshirish va keshni tozalash

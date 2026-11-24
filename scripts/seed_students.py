@@ -29,6 +29,12 @@ async def sync_students_seed():
         res = await session.execute(select(Student))
         existing_students = res.scalars().all()
 
+        # Raxmatullayev -> Rahmonaliyev almashtirish
+        for s in existing_students:
+            if (s.last_name or "").strip().lower() == "raxmatullayev" and s.first_name.strip().lower() == "fazliddin":
+                s.last_name = "Rahmonaliyev"
+                print("Mavjud Raxmatullayev Fazliddin -> Rahmonaliyev Fazliddin ga yangilandi.")
+
         existing_map = {}
         for s in existing_students:
             key = (s.last_name or "").strip().lower(), s.first_name.strip().lower()
